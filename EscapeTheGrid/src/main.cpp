@@ -6,10 +6,14 @@
 #include <queue>
 #include <iostream>
 #include <cmath>
+#include <memory>
 
 using namespace std;
 
+// ==================== ESTRUCTURAS Y ENUMS ====================
 enum class CellType { Empty, Wall, Start, Goal, Crystal };
+enum class GameState { Menu, Playing, Solved };
+
 struct Cell { 
     CellType type; 
     bool visited = false; 
@@ -17,8 +21,6 @@ struct Cell {
     bool hasBeenTraversed = false;
     bool isReflected = false;
 };
-
-enum class GameState { Menu, Playing, Solved };
 
 struct Button {
     sf::RectangleShape shape;
@@ -73,6 +75,11 @@ struct Button {
     }
 };
 
+// ==================== VARIABLES GLOBALES ====================
+int turnCount = 0;
+const int TURNS_PER_EVENT = 5;
+const int TURNS_TO_MOVE_GOAL = 10;
+int turnsSinceLastGoalMove = 0;
 int W, H;
 vector<Cell> grid;
 int startX, startY, goalX, goalY;
@@ -83,6 +90,52 @@ float cellSize = 35.f;
 float menuWidth = 300.f;
 sf::Vector2f gameOffset(0, 0);
 sf::View gameView, menuView;
+
+// ==================== FUNCIONES DEL JUEGO ====================
+
+void verifyGoal(sf::CircleShape& goal) {
+    if (grid[goalY*W + goalX].type != CellType::Goal) {
+        grid[goalY*W + goalX].type = CellType::Goal;
+    }
+    
+    goal.setFillColor(sf::Color(0, 255, 0, 255));
+    goal.setOutlineColor(sf::Color::White);
+    goal.setOutlineThickness(3.f);
+    goal.setPosition(
+        goalX * cellSize + cellSize/2 - cellSize/5,
+        goalY * cellSize + cellSize/2 - cellSize/5
+    );
+}
+
+void moveGoal(int currentX, int currentY, sf::CircleShape& goal) {
+    int oldGoalX = goalX;
+    int oldGoalY = goalY;
+    
+    vector<pair<int, int>> emptyCells;
+    for (int y = 0; y < H; ++y) {
+        for (int x = 0; x < W; ++x) {
+            if (grid[y*W + x].type == CellType::Empty && 
+                !(x == currentX && y == currentY)) {
+                emptyCells.emplace_back(y, x);
+            }
+        }
+    }
+    
+    if (!emptyCells.empty()) {
+        int index = rand() % emptyCells.size();
+        auto [newY, newX] = emptyCells[index];
+        
+        grid[oldGoalY*W + oldGoalX].type = CellType::Empty;
+        goalX = newX;
+        goalY = newY;
+        grid[goalY*W + goalX].type = CellType::Goal;
+        
+        verifyGoal(goal);
+        cout << "¡La salida se ha movido a (" << goalX << ", " << goalY << ")!\n";
+    }
+    
+    turnsSinceLastGoalMove = 0;
+}
 
 bool loadMaze(const string& path) {
     ifstream file(path);
@@ -98,7 +151,7 @@ bool loadMaze(const string& path) {
     
     grid.resize(W * H);
     string line;
-    getline(file, line);  // consumimos el resto de la línea de cabecera
+    getline(file, line);
     
     for (int y = 0; y < H; y++) {
         if (!getline(file, line)) {
@@ -112,17 +165,16 @@ bool loadMaze(const string& path) {
                 cout << "Error leyendo celda [" << x << "," << y << "]" << endl;
                 return false;
             }
-            if      (t == "#")                   grid[y*W + x] = { CellType::Wall,    false, false, false };
-            else if (t == "S")                   grid[y*W + x] = { CellType::Start,   false, false, false };
-            else if (t == "G")                   grid[y*W + x] = { CellType::Goal,    false, false, false };
-            else if (t == "C" || t == "K")       grid[y*W + x] = { CellType::Crystal, false, false, false };
-            else                                 grid[y*W + x] = { CellType::Empty,   false, false, false };
+            if (t == "#") grid[y*W + x] = {CellType::Wall};
+            else if (t == "S") grid[y*W + x] = {CellType::Start};
+            else if (t == "G") grid[y*W + x] = {CellType::Goal};
+            else if (t == "C" || t == "K") grid[y*W + x] = {CellType::Crystal};
+            else grid[y*W + x] = {CellType::Empty};
         }
     }
-    cout << "Laberinto cargado: " << W << "x" << H << endl;
+
     return true;
 }
-
 
 void createDefaultMaze() {
     W = 12; H = 10;
@@ -130,45 +182,85 @@ void createDefaultMaze() {
     goalX = 10; goalY = 8;
     
     grid.resize(W * H);
-    
-    for (int i = 0; i < W * H; i++) {
-        grid[i] = {CellType::Empty, false, false, false};
+
+    for (auto& cell : grid) {
+        cell = {CellType::Empty};
     }
-    
+
     vector<pair<int,int>> walls = {
-        {0,0}, {0,1}, {0,2}, {0,3}, {0,4}, {0,5}, {0,6}, {0,7}, {0,8}, {0,9},
-        {11,0}, {11,1}, {11,2}, {11,3}, {11,4}, {11,5}, {11,6}, {11,7}, {11,8}, {11,9},
-        {1,0}, {2,0}, {3,0}, {4,0}, {5,0}, {6,0}, {7,0}, {8,0}, {9,0}, {10,0},
-        {1,9}, {2,9}, {3,9}, {4,9}, {5,9}, {6,9}, {7,9}, {8,9}, {9,9}, {10,9},
-        {2,2}, {2,3}, {2,4}, {4,2}, {4,4}, {4,5}, {4,6},
-        {6,1}, {6,3}, {6,5}, {6,7}, {8,2}, {8,4}, {8,6}, {8,7},
-        {3,7}, {5,7}, {7,7}, {9,3}, {9,5}
+        {0,0},{0,1},{0,2},{0,3},{0,4},{0,5},{0,6},{0,7},{0,8},{0,9},
+        {11,0},{11,1},{11,2},{11,3},{11,4},{11,5},{11,6},{11,7},{11,8},{11,9},
+        {1,0},{2,0},{3,0},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},
+        {1,9},{2,9},{3,9},{4,9},{5,9},{6,9},{7,9},{8,9},{9,9},{10,9},
+        {2,2},{2,3},{2,4},{4,2},{4,4},{4,5},{4,6},
+        {6,1},{6,3},{6,5},{6,7},{8,2},{8,4},{8,6},{8,7},
+        {3,7},{5,7},{7,7},{9,3},{9,5}
     };
-    
+
     for (auto [x,y] : walls) {
-        if (x < W && y < H) {
-            grid[y*W + x] = {CellType::Wall, false, false, false};
-        }
+        grid[y*W + x] = {CellType::Wall};
+    }
+
+    grid[3*W + 6] = {CellType::Crystal};
+    grid[6*W + 9] = {CellType::Crystal};
+
+    grid[startY*W + startX] = {CellType::Start};
+    grid[goalY*W + goalX] = {CellType::Goal};
+}
+
+void resetGame(sf::CircleShape& goal) {
+    gameState = GameState::Menu;
+    turnCount = 0;
+    turnsSinceLastGoalMove = 0;
+    path.clear();
+
+    if (!loadMaze("../assets/maze.txt") && !loadMaze("assets/maze.txt") && !loadMaze("maze.txt")) {
+        createDefaultMaze();
+    }
+
+    for (auto& cell : grid) {
+        cell.visited = false;
+        cell.isOnPath = false;
+        cell.hasBeenTraversed = false;
+        cell.isReflected = false;
     }
     
-    grid[3*W + 6] = {CellType::Crystal, false, false, false};
-    grid[6*W + 9] = {CellType::Crystal, false, false, false};
-    
-    grid[startY*W + startX] = {CellType::Start, false, false, false};
-    grid[goalY*W + goalX] = {CellType::Goal, false, false, false};
-    
-    cout << "Usando laberinto por defecto: " << W << "x" << H << endl;
+    grid[startY*W + startX].hasBeenTraversed = true;
+    verifyGoal(goal);
 }
 
 bool inside(int y, int x) {
     return x >= 0 && x < W && y >= 0 && y < H;
 }
 
+void triggerMapEvent() {
+    int rx = rand() % W;
+    int ry = rand() % H;
+    Cell& c = grid[ry*W + rx];
+    if (c.type == CellType::Empty) {
+        c.type = CellType::Wall;
+        cout << "Evento: aparece muro en (" << rx << "," << ry << ")\n";
+    }
+    else if (c.type == CellType::Wall) {
+        c.type = CellType::Empty;
+        cout << "Evento: desaparece muro en (" << rx << "," << ry << ")\n";
+    }
+}
+
+// ==================== FUNCIÓN bfsSolve MODIFICADA ====================
 void bfsSolve() {
+    int tempGoalX = goalX;
+    int tempGoalY = goalY;
+    
     for (auto& cell : grid) {
         cell.visited = false;
         cell.isOnPath = false;
     }
+    
+    grid[tempGoalY*W + tempGoalX].type = CellType::Goal;
+    goalX = tempGoalX;
+    goalY = tempGoalY;
+    
     path.clear();
     
     vector<vector<bool>> vis(H, vector<bool>(W, false));
@@ -182,7 +274,7 @@ void bfsSolve() {
 
     while (!q.empty()) {
         auto [y,x] = q.front(); q.pop();
-        grid[y*W+x].visited = true;
+        
         
         if (y == goalY && x == goalX) { 
             found = true; 
@@ -205,7 +297,7 @@ void bfsSolve() {
     if (found) {
         for (int cy = goalY, cx = goalX; cy != -1; ) {
             path.push_back({cy,cx});
-            grid[cy*W+cx].isOnPath = true;
+         
             auto p = parent[cy][cx];
             cy = p.first; 
             cx = p.second;
@@ -214,63 +306,78 @@ void bfsSolve() {
     }
 }
 
+// ==================== FUNCIÓN getCellColor MODIFICADA ====================
+sf::Color getCellColor(CellType type, int x, int y, bool visited, bool isOnPath, bool hasBeenTraversed, bool isReflected) {
+    if (type == CellType::Crystal) return sf::Color(0, 255, 255, 180);
+    
+    if (type == CellType::Goal) return sf::Color(0, 200, 0, 150);
+    
+    if (isReflected) return sf::Color(150, 220, 255, 200);
+    if (hasBeenTraversed) return sf::Color(192, 192, 192, 200);
+    
+    switch (type) {
+        case CellType::Wall: return sf::Color(40, 40, 40);
+        case CellType::Start: return sf::Color(100, 255, 100, 200);
+        case CellType::Empty:
+        default: 
+            return ((x + y) % 2 == 0) ? sf::Color(120, 120, 200, 120) : sf::Color(100, 100, 180, 120);
+    }
+}
+
 void reflectCrystals() {
-    // 2.1) Limpiar reflexiones previas
     for (auto& c : grid) {
         c.isReflected = false;
     }
 
-    // 2.2) Recorremos TODO el grid buscando cristales
     for (int y = 0; y < H; ++y) {
         for (int x = 0; x < W; ++x) {
             if (grid[y*W + x].type != CellType::Crystal) 
                 continue;
 
-            // --- horizontal: copiar izq → der ---
             for (int d = 1; ; ++d) {
                 int xs = x - d, xt = x + d;
-                if (xs < 0 || xt >= W) 
-                    break;
-                // fuente debe haber sido recorrida y destino no ser muro
-                if (grid[y*W + xs].hasBeenTraversed 
-                    && grid[y*W + xt].type != CellType::Wall) 
-                {
+                if (xs < 0 || xt >= W) break;
+                if (grid[y*W + xs].hasBeenTraversed && grid[y*W + xt].type != CellType::Wall) {
                     grid[y*W + xt].hasBeenTraversed = true;
-                    grid[y*W + xt].isReflected    = true;
+                    grid[y*W + xt].isReflected = true;
                 }
             }
 
-            // --- vertical: copiar arriba → abajo ---
             for (int d = 1; ; ++d) {
                 int ys = y - d, yt = y + d;
-                if (ys < 0 || yt >= H) 
-                    break;
-                if (grid[ys*W + x].hasBeenTraversed 
-                    && grid[yt*W + x].type != CellType::Wall) 
-                {
+                if (ys < 0 || yt >= H) break;
+                if (grid[ys*W + x].hasBeenTraversed && grid[yt*W + x].type != CellType::Wall) {
                     grid[yt*W + x].hasBeenTraversed = true;
-                    grid[yt*W + x].isReflected      = true;
+                    grid[yt*W + x].isReflected = true;
                 }
             }
         }
     }
 }
 
-bool tryMovePlayer(int newX, int newY, int& currentX, int& currentY, sf::CircleShape& player) {
-     if (inside(newY, newX) && grid[newY*W + newX].type != CellType::Wall) {
+bool tryMovePlayer(int newX, int newY, int& currentX, int& currentY, sf::CircleShape& player, sf::CircleShape& goal) {
+    if (inside(newY, newX) && grid[newY*W + newX].type != CellType::Wall) {
         currentX = newX;
         currentY = newY;
-        sf::Vector2f newPos(newX * cellSize + cellSize/2 - cellSize/5,
-                            newY * cellSize + cellSize/2 - cellSize/5);
+        sf::Vector2f newPos(
+            newX * cellSize + cellSize/2 - cellSize/5,
+            newY * cellSize + cellSize/2 - cellSize/5
+        );
         player.setPosition(newPos);
 
-        // Solo marcamos como recorrido si NO es un cristal
-        if (grid[currentY*W + currentX].type != CellType::Crystal) {
-            grid[currentY*W + currentX].hasBeenTraversed = true;
-        }
-
-        // 3) Propagar reflexiones desde cada cristal
+        grid[currentY*W + currentX].hasBeenTraversed = true;
         reflectCrystals();
+
+        turnCount++;
+        turnsSinceLastGoalMove++;
+        
+        if (turnsSinceLastGoalMove >= TURNS_TO_MOVE_GOAL) {
+            moveGoal(currentX, currentY, goal);
+        }
+        
+        if (turnCount % TURNS_PER_EVENT == 0) {
+            triggerMapEvent();
+        }
 
         return true;
     }
@@ -293,21 +400,21 @@ sf::ConvexShape makeTri(int x, int y) {
     const float horizontalStretch = 10.f;
     const float verticalStretch = 0.f;
     
-    float left   = px - horizontalStretch/2;
-    float right  = px + triWidth + horizontalStretch/2;
+    float left = px - horizontalStretch/2;
+    float right = px + triWidth + horizontalStretch/2;
     float centerX = px + triWidth / 2.f;
     
     float top = py;
     float bottom = py + triHeight + verticalStretch;
 
     if (up) {
-        tri.setPoint(0, { centerX, top });
-        tri.setPoint(1, { left,    bottom });
-        tri.setPoint(2, { right,   bottom });
+        tri.setPoint(0, sf::Vector2f(centerX, top));
+        tri.setPoint(1, sf::Vector2f(left, bottom));
+        tri.setPoint(2, sf::Vector2f(right, bottom));
     } else {
-        tri.setPoint(0, { centerX, bottom });
-        tri.setPoint(1, { left,    top });
-        tri.setPoint(2, { right,   top });
+        tri.setPoint(0, sf::Vector2f(centerX, bottom));
+        tri.setPoint(1, sf::Vector2f(left, top));
+        tri.setPoint(2, sf::Vector2f(right, top));
     }
 
     tri.setOutlineThickness(0.5f);
@@ -315,43 +422,6 @@ sf::ConvexShape makeTri(int x, int y) {
     return tri;
 }
 
-sf::Color getCellColor(CellType type, int x, int y,
-                       bool visited, bool isOnPath,
-                       bool hasBeenTraversed, bool isReflected) {
-    // 1) Si es un cristal, siempre devolvemos su color original
-    if (type == CellType::Crystal) {
-        return sf::Color(0, 255, 255, 180);
-    }
-
-    // 2) Si es reflejado, celeste más claro
-    if (isReflected) {
-        return sf::Color(150, 220, 255, 200);
-    }
-
-    // 3) Camino “real” del jugador
-    if (hasBeenTraversed) {
-        return sf::Color(192, 192, 192, 200);
-    }
-
-    // 4) Celdas visitadas por la búsqueda
-    if (visited) {
-        return sf::Color(150, 150, 255, 150);
-    }
-
-    // 5) Resto de celdas vacías / muros / meta
-    switch (type) {
-        case CellType::Wall:
-            return sf::Color(40, 40, 40);
-        case CellType::Start:
-        case CellType::Goal:
-            return sf::Color(100, 255, 100, 200);
-        case CellType::Empty:
-        default:
-            return ((x + y) % 2 == 0)
-                ? sf::Color(120, 120, 200, 120)
-                : sf::Color(100, 100, 180, 120);
-    }
-}
 
 
 sf::Text createStyledText(const string& text, sf::Font& font, int size, sf::Color color, float x, float y) {
@@ -385,7 +455,7 @@ void updateViews(sf::RenderWindow& window) {
 
 int main() {
     if (!loadMaze("../assets/maze.txt") && !loadMaze("assets/maze.txt") && !loadMaze("maze.txt")) {
-        cout << "No se encontro maze.txt, creando laberinto por defecto..." << endl;
+      
         createDefaultMaze();
     }
 
@@ -393,16 +463,16 @@ int main() {
     float initialGameHeight = H * cellSize;
     float initialTotalWidth = initialGameWidth + menuWidth;
     
-    sf::RenderWindow window({ (unsigned int)initialTotalWidth, (unsigned int)initialGameHeight }, 
-                           "Escape the Grid", 
-                           sf::Style::Default);
+    sf::RenderWindow window(sf::VideoMode(initialTotalWidth, initialGameHeight), "Escape the Grid");
     window.setFramerateLimit(60);
     
     updateViews(window);
     
     sf::Font font;
-    if (!font.loadFromFile("../assets/arial.ttf"))
-        font.loadFromFile("assets/arial.ttf");
+    if (!font.loadFromFile("../assets/arial.ttf") && !font.loadFromFile("assets/arial.ttf")) {
+        cerr << "Error cargando fuente" << endl;
+        return 1;
+    }
 
     sf::RectangleShape menuBackground(sf::Vector2f(menuWidth, 2000));
     menuBackground.setPosition(0, 0);
@@ -410,43 +480,34 @@ int main() {
     menuBackground.setOutlineThickness(2.f);
     menuBackground.setOutlineColor(sf::Color(100, 100, 150, 150));
 
-    // Texto de bienvenida arriba de todo (centrado)
+    
     sf::Text titleText("ESCAPE THE GRID", font, 24);
     titleText.setFillColor(sf::Color(150, 255, 255));
     sf::FloatRect titleBounds = titleText.getLocalBounds();
     titleText.setPosition((menuWidth - titleBounds.width) / 2.f, 20);
-    
-    /*sf::Text titleText("Escape the Grid", font, 20);
-    titleText.setFillColor(sf::Color(255, 255, 150));
-    sf::FloatRect titleBounds = titleText.getLocalBounds();
-    titleText.setPosition((menuWidth - titleBounds.width) / 2.f, 50);*/
 
-    // Botones debajo del título
     vector<unique_ptr<Button>> buttons;
     buttons.push_back(make_unique<Button>(30, 100, 240, 40, "JUGAR", font, sf::Color(50, 150, 50, 200)));
     buttons.push_back(make_unique<Button>(30, 150, 240, 40, "AUTOCOMPLETAR", font, sf::Color(150, 100, 50, 200)));
     buttons.push_back(make_unique<Button>(30, 200, 240, 40, "REINICIAR", font, sf::Color(150, 50, 50, 200)));
 
-    // Configuración de columnas para información y controles
-    float column1X = 30;          // Columna izquierda (Información)
-    float column2X = 160;         // Columna derecha (Controles)
-    float columnsStartY = 260;    // Posición vertical para las columnas
-
-    // Información (columna izquierda)
+    float column1X = 30, column2X = 160, columnsStartY = 260;
     sf::Text infoTitle = createStyledText("INFORMACION", font, 16, sf::Color(255, 255, 150), column1X, columnsStartY);
-    sf::Text playerInfo = createStyledText("- Jugador (azul)", font, 14, sf::Color(100, 150, 255), column1X, columnsStartY + 30);
-    sf::Text goalInfo = createStyledText("- Meta (verde)", font, 14, sf::Color(100, 255, 100), column1X, columnsStartY + 60);
-    sf::Text wallInfo = createStyledText("- Muro (gris)", font, 14, sf::Color(150, 150, 150), column1X, columnsStartY + 90);
-    sf::Text crystalInfo = createStyledText("- Cristal (cyan)", font, 14, sf::Color(0, 255, 255), column1X, columnsStartY + 120);
+    vector<sf::Text> infoTexts = {
+        createStyledText("- Jugador (azul)", font, 14, sf::Color(100, 150, 255), column1X, columnsStartY + 30),
+        createStyledText("- Meta (verde)", font, 14, sf::Color(100, 255, 100), column1X, columnsStartY + 60),
+        createStyledText("- Muro (gris)", font, 14, sf::Color(150, 150, 150), column1X, columnsStartY + 90),
+        createStyledText("- Cristal (cyan)", font, 14, sf::Color(0, 255, 255), column1X, columnsStartY + 120)
+    };
 
-    // Controles (columna derecha)
     sf::Text controlsTitle = createStyledText("CONTROLES", font, 16, sf::Color(255, 255, 150), column2X, columnsStartY);
-    sf::Text arrowKeys = createStyledText("- Flechas: Mover", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 30);
-    sf::Text enterKey = createStyledText("- ENTER: Resolver", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 60);
-    sf::Text rKey = createStyledText("- R: Reiniciar", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 90);
-    sf::Text clickInfo = createStyledText("- Click: Mover", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 120);
+    vector<sf::Text> controlTexts = {
+        createStyledText("- Flechas: Mover", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 30),
+        createStyledText("- ENTER: Resolver", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 60),
+        createStyledText("- R: Reiniciar", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 90),
+        createStyledText("- Click: Mover", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 120)
+    };
 
-    // Estado del juego (abajo)
     sf::Text statusText("", font, 14);
     sf::Text movesText("Movimientos: 0", font, 14);
     sf::Text timeText("Tiempo: 0:00", font, 14);
@@ -455,12 +516,12 @@ int main() {
     player.setFillColor(sf::Color(50, 150, 255));
     player.setOutlineThickness(2.f);
     player.setOutlineColor(sf::Color::White);
-    goal.setFillColor(sf::Color(50, 255, 50));
-    goal.setOutlineThickness(2.f);
+    goal.setFillColor(sf::Color(0, 255, 0, 255));
+    goal.setOutlineThickness(3.f);
     goal.setOutlineColor(sf::Color::White);
 
     player.setPosition(startX * cellSize + cellSize/2 - cellSize/5, startY * cellSize + cellSize/2 - cellSize/5);
-    goal.setPosition(goalX * cellSize + cellSize/2 - cellSize/5, goalY * cellSize + cellSize/2 - cellSize/5);
+    verifyGoal(goal);
 
     bool autoMode = false;
     bool solved = false;
@@ -489,17 +550,23 @@ int main() {
                 sf::Vector2f menuCoords = windowToMenuCoords(mousePos, window);
                 sf::Vector2f gameCoords = windowToGameCoords(mousePos, window);
                 
+                bool buttonClicked = false;
                 for (size_t i = 0; i < buttons.size(); i++) {
                     if (buttons[i]->contains(menuCoords.x, menuCoords.y)) {
+                        buttonClicked = true;
                         switch (i) {
-                            case 0: // Boton JUGAR
+                            case 0: // JUGAR
                                 gameState = GameState::Playing;
                                 autoMode = false;
+                                solved = false;
                                 gameClock.restart();
                                 break;
-                            case 1: // Boton AUTO
+                            case 1: // AUTOCOMPLETAR
                                 if (gameState == GameState::Menu || gameState == GameState::Playing) {
                                     gameState = GameState::Playing;
+                                    solved = false;
+                                    startY = currentY;
+                                    startX = currentX;
                                     bfsSolve();
                                     autoMode = true;
                                     step = 0;
@@ -508,33 +575,20 @@ int main() {
                                     gameClock.restart();
                                 }
                                 break;
-                            case 2: // Boton RESET
-                                autoMode = false;
-                                solved  = false;
-                                step    = 0;
-                                moveCount = 0;
+                            case 2: // REINICIAR
+                                resetGame(goal);
                                 currentX = startX;
                                 currentY = startY;
-                                currentPos = sf::Vector2f(
+                                player.setPosition(
                                     startX * cellSize + cellSize/2 - cellSize/5,
                                     startY * cellSize + cellSize/2 - cellSize/5
                                 );
-                                player.setPosition(currentPos);
-
-                                // 1) Limpiar todos los estados de las celdas
-                                for (auto& cell : grid) {
-                                    cell.visited         = false;
-                                    cell.isOnPath        = false;
-                                    cell.hasBeenTraversed = false;
-                                    cell.isReflected     = false;   // ← AÑADIDO: limpiamos reflexiones
-                                }
-
-                                // 2) Marcar punto de inicio como recorrido
-                                grid[startY*W + startX].hasBeenTraversed = true;
-
-                                path.clear();
+                                currentPos = player.getPosition();
+                                moveCount = 0;
+                                solved = false;
+                                autoMode = false;
                                 gameState = GameState::Menu;
-                                gameClock.restart();
+                                
                                 break;
                         }
                         break;
@@ -551,7 +605,7 @@ int main() {
                             int dy = abs(clickY - currentY);
                             
                             if ((dx == 1 && dy == 0) || (dx == 0 && dy == 1)) {
-                                if (tryMovePlayer(clickX, clickY, currentX, currentY, player)) {
+                                if (tryMovePlayer(clickX, clickY, currentX, currentY, player, goal)) {
                                     moveCount++;
                                     if (currentX == goalX && currentY == goalY) {
                                         solved = true;
@@ -578,16 +632,16 @@ int main() {
                     bool moved = false;
                     
                     if (e.key.code == sf::Keyboard::Up) {
-                        moved = tryMovePlayer(currentX, currentY - 1, currentX, currentY, player);
+                        moved = tryMovePlayer(currentX, currentY - 1, currentX, currentY, player, goal);
                     }
                     else if (e.key.code == sf::Keyboard::Down) {
-                        moved = tryMovePlayer(currentX, currentY + 1, currentX, currentY, player);
+                        moved = tryMovePlayer(currentX, currentY + 1, currentX, currentY, player, goal);
                     }
                     else if (e.key.code == sf::Keyboard::Left) {
-                        moved = tryMovePlayer(currentX - 1, currentY, currentX, currentY, player);
+                        moved = tryMovePlayer(currentX - 1, currentY, currentX, currentY, player, goal);
                     }
                     else if (e.key.code == sf::Keyboard::Right) {
-                        moved = tryMovePlayer(currentX + 1, currentY, currentX, currentY, player);
+                        moved = tryMovePlayer(currentX + 1, currentY, currentX, currentY, player, goal);
                     }
                     
                     if (moved) {
@@ -600,6 +654,8 @@ int main() {
                 }
                 
                 if (e.key.code == sf::Keyboard::Enter && !autoMode && gameState == GameState::Playing) {
+                    startY = currentY;
+                    startX = currentX;
                     bfsSolve();
                     autoMode = true;
                     step = 0;
@@ -607,32 +663,19 @@ int main() {
                 }
                 
                 if (e.key.code == sf::Keyboard::R) {
-                    autoMode = false;
-                    solved   = false;
-                    step     = 0;
-                    moveCount = 0;
+                    resetGame(goal);
                     currentX = startX;
                     currentY = startY;
-                    currentPos = sf::Vector2f(
+                    player.setPosition(
                         startX * cellSize + cellSize/2 - cellSize/5,
                         startY * cellSize + cellSize/2 - cellSize/5
                     );
-                    player.setPosition(currentPos);
-
-                    // Limpiar estados de celdas incluyendo reflexiones
-                    for (auto& cell : grid) {
-                        cell.visited          = false;
-                        cell.isOnPath         = false;
-                        cell.hasBeenTraversed = false;
-                        cell.isReflected      = false;  // ← AÑADIDO
-                    }
-
-                    // Punto de inicio marcado de nuevo
-                    grid[startY*W + startX].hasBeenTraversed = true;
-
-                    path.clear();
+                    currentPos = player.getPosition();
+                    moveCount = 0;
+                    solved = false;
+                    autoMode = false;
                     gameState = GameState::Menu;
-                    gameClock.restart();
+
                 }
             }
         }
@@ -645,34 +688,64 @@ int main() {
             );
 
             sf::Vector2f direction = nextPos - currentPos;
-            float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y);
-            float animationSpeed = 5.0f;
+            float distance = sqrt(direction.x*direction.x + direction.y*direction.y);
+            float animationSpeed = 5.f;
 
-            if (distance > 1.0f) {
+            if (distance > 1.f) {
                 direction /= distance;
                 currentPos += direction * animationSpeed * dt * cellSize;
                 player.setPosition(currentPos);
             } else {
-                // 1) Avanzamos al siguiente paso
                 currentPos = nextPos;
                 player.setPosition(currentPos);
                 currentX = x;
                 currentY = y;
 
-                // 2) Marcamos recorrido
                 grid[y*W + x].hasBeenTraversed = true;
+                reflectCrystals();
 
-                // 3) ¡Aquí está la diferencia!  
-                //    Después de cada paso en autocompletado, propagamos reflejos.
-                reflectCrystals();  
+                turnCount++;
+                turnsSinceLastGoalMove++;
+                
+                if (turnsSinceLastGoalMove >= TURNS_TO_MOVE_GOAL) {
+                    moveGoal(currentX, currentY, goal);
+                }
+                
+                if (turnCount % TURNS_PER_EVENT == 0) {
+                    triggerMapEvent();
+                    startY = currentY;
+                    startX = currentX;
+
+                    int savedGoalX = goalX;
+                    int savedGoalY = goalY;
+
+                    bfsSolve();
+
+                    goalX = savedGoalX;
+                    goalY = savedGoalY;
+                    grid[goalY*W + goalX].type = CellType::Goal;
+                    verifyGoal(goal);
+
+                    step = 0;
+                    if (path.empty()) {
+                        autoMode = false;
+                        break;
+                    }
+                    continue;  
+                }
 
                 step++;
                 moveCount++;
 
-                if (step >= path.size()) {
+                if (currentX == goalX && currentY == goalY) {
                     solved = true;
                     gameState = GameState::Solved;
+                    autoMode = false;
                 }
+            }
+            
+            if (step % 5 == 0) {
+                verifyGoal(goal);
             }
         }
 
@@ -681,8 +754,8 @@ int main() {
         int seconds = (int)elapsedTime % 60;
         
         sf::Vector2u windowSize = window.getSize();
-        float statusY = windowSize.y - 80;
         
+
         movesText.setString("Movimientos: " + to_string(moveCount));
         timeText.setString("Tiempo: " + to_string(minutes) + ":" + (seconds < 10 ? "0" : "") + to_string(seconds));
         
@@ -692,13 +765,8 @@ int main() {
                 statusText.setFillColor(sf::Color(150, 255, 150));
                 break;
             case GameState::Playing:
-                if (autoMode) {
-                    statusText.setString("Resolviendo...");
-                    statusText.setFillColor(sf::Color(255, 255, 150));
-                } else {
-                    statusText.setString("Jugando!");
-                    statusText.setFillColor(sf::Color(150, 150, 255));
-                }
+                statusText.setString(autoMode ? "Resolviendo..." : "Jugando!");
+                statusText.setFillColor(autoMode ? sf::Color(255, 255, 150) : sf::Color(150, 150, 255));
                 break;
             case GameState::Solved:
                 statusText.setString("Completado!");
@@ -706,7 +774,7 @@ int main() {
                 break;
         }
 
-        // Posicionar textos de estado abajo (centrados)
+        
         sf::FloatRect statusBounds = statusText.getLocalBounds();
         statusText.setPosition((menuWidth - statusBounds.width) / 2.f, windowSize.y - 60);
         
@@ -719,15 +787,12 @@ int main() {
         window.clear(sf::Color(15, 15, 25));
         
         window.setView(gameView);
-        
+
         for (int y = 0; y < H; ++y) {
             for (int x = 0; x < W; ++x) {
                 Cell& cell = grid[y*W + x];
                 sf::ConvexShape tri = makeTri(x, y);
-                
-                sf::Color fillColor = getCellColor(cell.type, x, y, cell.visited, cell.isOnPath, cell.hasBeenTraversed, cell.isReflected);
-                tri.setFillColor(fillColor);
-                
+                tri.setFillColor(getCellColor(cell.type, x, y, cell.visited, cell.isOnPath, cell.hasBeenTraversed, cell.isReflected));
                 window.draw(tri);
                 
                 if (cell.type == CellType::Crystal) {
@@ -738,6 +803,7 @@ int main() {
             }
         }
 
+        verifyGoal(goal);
         window.draw(goal);
         window.draw(player);
 
@@ -745,29 +811,22 @@ int main() {
         
         window.draw(menuBackground);
         
-        // Bienvenida arriba de todo (centrada)
-        //window.draw(welcomeText);
+        
         window.draw(titleText);
         
-        // Botones
+
         for (auto& button : buttons) {
             button->draw(window);
         }
         
-        // Columnas de información y controles
+
         window.draw(infoTitle);
-        window.draw(playerInfo);
-        window.draw(goalInfo);
-        window.draw(wallInfo);
-        window.draw(crystalInfo);
+        for (auto& text : infoTexts) window.draw(text);
         
         window.draw(controlsTitle);
-        window.draw(arrowKeys);
-        window.draw(enterKey);
-        window.draw(rKey);
-        window.draw(clickInfo);
+        for (auto& text : controlTexts) window.draw(text);
         
-        // Estado del juego abajo (centrado)
+
         window.draw(statusText);
         window.draw(movesText);
         window.draw(timeText);
