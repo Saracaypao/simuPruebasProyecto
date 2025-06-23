@@ -7,6 +7,7 @@
 #include <iostream>
 #include <cmath>
 #include <memory>
+#include <unordered_map>
 
 using namespace std;
 
@@ -20,6 +21,7 @@ struct Cell {
     bool isOnPath = false;
     bool hasBeenTraversed = false;
     bool isReflected = false;
+    bool isDirty = false;
 };
 
 struct Button {
@@ -122,9 +124,45 @@ void moveGoal(int currentX, int currentY, sf::CircleShape& goal) {
     }
     
     if (!emptyCells.empty()) {
-        int index = rand() % emptyCells.size();
-        auto [newY, newX] = emptyCells[index];
+        // Algoritmo híbrido: 70% aleatorio, 30% considerando distancia
+        int selectedIndex;
         
+        if (rand() % 100 < 70) {
+            // 70% de las veces: movimiento completamente aleatorio
+            selectedIndex = rand() % emptyCells.size();
+        } else {
+            // 30% de las veces: preferir posiciones no demasiado cerca ni demasiado lejos
+            vector<pair<int, int>> balancedCells;
+            
+            for (size_t i = 0; i < emptyCells.size(); i++) {
+                auto [y, x] = emptyCells[i];
+                int distance = abs(x - currentX) + abs(y - currentY);
+                
+                // Preferir distancias medias (ni muy cerca ni muy lejos)
+                if (distance >= 3 && distance <= 8) {
+                    balancedCells.push_back({y, x});
+                }
+            }
+            
+            if (!balancedCells.empty()) {
+                // Seleccionar aleatoriamente de las posiciones balanceadas
+                int balancedIndex = rand() % balancedCells.size();
+                auto [selectedY, selectedX] = balancedCells[balancedIndex];
+                
+                // Encontrar el índice en emptyCells
+                for (size_t i = 0; i < emptyCells.size(); i++) {
+                    if (emptyCells[i].first == selectedY && emptyCells[i].second == selectedX) {
+                        selectedIndex = i;
+                        break;
+                    }
+                }
+            } else {
+                // Si no hay posiciones balanceadas, seleccionar aleatoriamente
+                selectedIndex = rand() % emptyCells.size();
+            }
+        }
+        
+        auto [newY, newX] = emptyCells[selectedIndex];
         grid[oldGoalY*W + oldGoalX].type = CellType::Empty;
         goalX = newX;
         goalY = newY;
@@ -323,6 +361,43 @@ sf::Color getCellColor(CellType type, int x, int y, bool visited, bool isOnPath,
             return ((x + y) % 2 == 0) ? sf::Color(120, 120, 200, 120) : sf::Color(100, 100, 180, 120);
     }
 }
+  
+void reflectDFS(int x, int y, int dx, int dy, int sourceX, int sourceY) {
+    int nextX = x + dx;
+    int nextY = y + dy;
+    
+    // Verificar límites
+    if (!inside(nextY, nextX)) return;
+    
+    // Si hay pared, detener
+    if (grid[nextY*W + nextX].type == CellType::Wall) return;
+    
+    // Si la celda fuente está traversed, reflejar
+    if (inside(sourceY, sourceX) && grid[sourceY*W + sourceX].hasBeenTraversed) {
+        grid[nextY*W + nextX].hasBeenTraversed = true;
+        grid[nextY*W + nextX].isReflected = true;
+        
+        // Continuar DFS
+        reflectDFS(nextX, nextY, dx, dy, sourceX - dx, sourceY - dy);
+    }
+}
+
+void reflectFromCrystal(int crystalX, int crystalY) {
+    // Direcciones: izquierda, derecha, arriba, abajo
+    int dirs[4][2] = {{-1,0}, {1,0}, {0,-1}, {0,1}};
+    
+    for (int d = 0; d < 4; d++) {
+        int dx = dirs[d][0];
+        int dy = dirs[d][1];
+        
+        // Buscar celdas traversed en dirección opuesta
+        int sourceX = crystalX - dx;
+        int sourceY = crystalY - dy;
+        
+        // DFS desde el cristal hacia la dirección del reflejo
+        reflectDFS(crystalX, crystalY, dx, dy, sourceX, sourceY);
+    }
+}
 
 void reflectCrystals() {
     for (auto& c : grid) {
@@ -334,21 +409,56 @@ void reflectCrystals() {
             if (grid[y*W + x].type != CellType::Crystal) 
                 continue;
 
-            for (int d = 1; ; ++d) {
-                int xs = x - d, xt = x + d;
-                if (xs < 0 || xt >= W) break;
-                if (grid[y*W + xs].hasBeenTraversed && grid[y*W + xt].type != CellType::Wall) {
-                    grid[y*W + xt].hasBeenTraversed = true;
-                    grid[y*W + xt].isReflected = true;
-                }
-            }
+            // DFS optimizado para reflejos horizontales y verticales
+            reflectFromCrystal(x, y);
+        }
+    }
+}
 
-            for (int d = 1; ; ++d) {
-                int ys = y - d, yt = y + d;
-                if (ys < 0 || yt >= H) break;
-                if (grid[ys*W + x].hasBeenTraversed && grid[yt*W + x].type != CellType::Wall) {
-                    grid[yt*W + x].hasBeenTraversed = true;
-                    grid[yt*W + x].isReflected = true;
+void optimizedReflectCrystals() {
+    // Reset solo las celdas reflejadas previamente
+    static vector<pair<int,int>> previouslyReflected;
+    for (auto [x, y] : previouslyReflected) {
+        grid[y*W + x].isReflected = false;
+        grid[y*W + x].isDirty = true;
+    }
+    previouslyReflected.clear();
+    
+    // Usar queue en lugar de recursión para evitar stack overflow
+    for (int y = 0; y < H; ++y) {
+        for (int x = 0; x < W; ++x) {
+            if (grid[y*W + x].type != CellType::Crystal) continue;
+            
+            // Flood fill iterativo
+            queue<pair<int,int>> q;
+            int dirs[4][2] = {{-1,0}, {1,0}, {0,-1}, {0,1}};
+            
+            for (int d = 0; d < 4; d++) {
+                int dx = dirs[d][0];
+                int dy = dirs[d][1];
+                
+                q.push({x, y});
+                
+                while (!q.empty()) {
+                    auto [cx, cy] = q.front();
+                    q.pop();
+                    
+                    int nextX = cx + dx;
+                    int nextY = cy + dy;
+                    
+                    if (!inside(nextY, nextX)) break;
+                    if (grid[nextY*W + nextX].type == CellType::Wall) break;
+                    
+                    int sourceX = cx - dx;
+                    int sourceY = cy - dy;
+                    
+                    if (inside(sourceY, sourceX) && grid[sourceY*W + sourceX].hasBeenTraversed) {
+                        grid[nextY*W + nextX].hasBeenTraversed = true;
+                        grid[nextY*W + nextX].isReflected = true;
+                        grid[nextY*W + nextX].isDirty = true;
+                        previouslyReflected.push_back({nextX, nextY});
+                        q.push({nextX, nextY});
+                    }
                 }
             }
         }
@@ -453,9 +563,139 @@ void updateViews(sf::RenderWindow& window) {
     menuView.setViewport(sf::FloatRect(gameViewWidth / windowSize.x, 0, menuWidth / windowSize.x, 1.0f));
 }
 
+int calculateMinMoves() {
+    // DP para calcular mínimo número de movimientos
+    vector<vector<int>> dp(H, vector<int>(W, INT_MAX));
+    dp[startY][startX] = 0;
+    
+    queue<pair<int,int>> q;
+    q.push({startY, startX});
+    
+    while (!q.empty()) {
+        auto [y, x] = q.front();
+        q.pop();
+        
+        if (y == goalY && x == goalX) {
+            return dp[y][x];
+        }
+        
+        int dirs[4][2] = {{1,0}, {-1,0}, {0,1}, {0,-1}};
+        
+        for (auto& d : dirs) {
+            int ny = y + d[0];
+            int nx = x + d[1];
+            
+            if (inside(ny, nx) && grid[ny*W + nx].type != CellType::Wall) {
+                int newCost = dp[y][x] + 1;
+                
+                // Considerar costo adicional por eventos cada 5 movimientos
+                if ((newCost % TURNS_PER_EVENT) == 0) {
+                    newCost += 2; // Penalización por evento
+                }
+                
+                if (newCost < dp[ny][nx]) {
+                    dp[ny][nx] = newCost;
+                    q.push({ny, nx});
+                }
+            }
+        }
+    }
+    
+    return -1; // No hay camino
+}
+
+class SpatialHash {
+private:
+    unordered_map<int, vector<pair<int,int>>> grid;
+    int cellSize;
+    
+public:
+    SpatialHash(int size) : cellSize(size) {}
+    
+    int hash(int x, int y) {
+        return (x / cellSize) * 1000 + (y / cellSize);
+    }
+    
+    void insert(int x, int y) {
+        grid[hash(x, y)].push_back({x, y});
+    }
+    
+    vector<pair<int,int>> getNearby(int x, int y) {
+        vector<pair<int,int>> nearby;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                int key = hash(x + dx * cellSize, y + dy * cellSize);
+                if (grid.count(key)) {
+                    nearby.insert(nearby.end(), grid[key].begin(), grid[key].end());
+                }
+            }
+        }
+        return nearby;
+    }
+};
+
+class ResourceManager {
+private:
+    static unordered_map<string, sf::Font> fonts;
+    static unordered_map<string, sf::Texture> textures;
+    static sf::Font defaultFont;
+    
+public:
+    static sf::Font& getFont(const string& path) {
+        // Verificar si ya está en caché
+        if (fonts.find(path) != fonts.end()) {
+            return fonts[path];
+        }
+        
+        // Intentar cargar la fuente
+        sf::Font font;
+        if (font.loadFromFile(path)) {
+            fonts[path] = font;
+            cout << "Fuente cargada exitosamente: " << path << endl;
+            return fonts[path];
+        } else {
+            cout << "Error cargando fuente: " << path << endl;
+            // Retornar fuente por defecto si falla
+            return getDefaultFont();
+        }
+    }
+    
+    static sf::Font& getDefaultFont() {
+        if (defaultFont.getInfo().family.empty()) {
+            // Intentar cargar fuente por defecto del sistema
+            if (!defaultFont.loadFromFile("C:/Windows/Fonts/arial.ttf")) {
+                // En Linux/Mac podrías usar /usr/share/fonts/...
+                cout << "No se pudo cargar fuente por defecto" << endl;
+            }
+        }
+        return defaultFont;
+    }
+    
+    static void loadSystemFont() {
+        getDefaultFont();
+    }
+    
+    static size_t getCacheSize() {
+        return fonts.size() + textures.size();
+    }
+    
+    static void clearCache() {
+        fonts.clear();
+        textures.clear();
+        cout << "Caché de recursos limpiado" << endl;
+    }
+};
+
+// Definiciones estáticas
+unordered_map<string, sf::Font> ResourceManager::fonts;
+unordered_map<string, sf::Texture> ResourceManager::textures;
+sf::Font ResourceManager::defaultFont;
+
 int main() {
+    // Inicializar generador de números aleatorios
+    srand(time(nullptr));
+    
     if (!loadMaze("../assets/maze.txt") && !loadMaze("assets/maze.txt") && !loadMaze("maze.txt")) {
-      
         createDefaultMaze();
     }
 
@@ -468,12 +708,17 @@ int main() {
     
     updateViews(window);
     
-    sf::Font font;
-    if (!font.loadFromFile("../assets/arial.ttf") && !font.loadFromFile("assets/arial.ttf")) {
-        cerr << "Error cargando fuente" << endl;
-        return 1;
+    // USAR ResourceManager en lugar de carga directa
+    sf::Font& font = ResourceManager::getFont("../assets/arial.ttf");
+    if (font.getInfo().family.empty()) {
+        // Fallback si no se encuentra el archivo
+        sf::Font& fallbackFont = ResourceManager::getFont("assets/arial.ttf");
+        if (fallbackFont.getInfo().family.empty()) {
+            // Si tampoco encuentra el fallback, usar fuente del sistema
+            ResourceManager::loadSystemFont();
+        }
     }
-
+    
     sf::RectangleShape menuBackground(sf::Vector2f(menuWidth, 2000));
     menuBackground.setPosition(0, 0);
     menuBackground.setFillColor(sf::Color(25, 25, 35, 240));
