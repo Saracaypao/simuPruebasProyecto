@@ -322,138 +322,192 @@ void resetGame(sf::CircleShape& goal) {
 }
 
 void triggerMapEvent() {
-    int rx = rand() % W;
-    int ry = rand() % H;
-    Cell& c = grid[ry*W + rx];
-    if (c.type == CellType::Empty) {
-        c.type = CellType::Wall;
-        cout << "Evento: aparece muro en (" << rx << "," << ry << ")\n";
+    static vector<int> validIndices; // Reutilizar vector
+    validIndices.clear();
+    
+    // Una sola pasada por el grid
+    for (int i = 0; i < W * H; ++i) {
+        Cell& c = grid[i];
+        if ((c.type == CellType::Empty && !c.hasBeenTraversed) || c.type == CellType::Wall) {
+            validIndices.push_back(i);
+        }
     }
-    else if (c.type == CellType::Wall) {
-        c.type = CellType::Empty;
-        cout << "Evento: desaparece muro en (" << rx << "," << ry << ")\n";
+    
+    if (!validIndices.empty()) {
+        int idx = validIndices[rand() % validIndices.size()];
+        Cell& c = grid[idx];
+        
+        if (c.type == CellType::Empty) {
+            c.type = CellType::Wall;
+            c.hasBeenTraversed = false;
+            cout << "Evento: aparece muro en (" << (idx % W) << "," << (idx / W) << ")\n";
+        } else {
+            c.type = CellType::Empty;
+            cout << "Evento: desaparece muro en (" << (idx % W) << "," << (idx / W) << ")\n";
+        }
     }
 }
 
-// AGREGAR al inicio de bfsSolve() para cache inteligente:
+// REEMPLAZAR la función bfsSolve() completamente (línea ~342):
 void bfsSolve() {
-    // LCS optimization: reutilizar segmentos de caminos anteriores si son similares
+    // Cache optimization: reutilizar caminos válidos
     static vector<pair<int,int>> lastPath;
     static int lastStartX = -1, lastStartY = -1, lastGoalX = -1, lastGoalY = -1;
+    static int lastTurnCount = -1;
     
-    // Verificar si podemos reutilizar el camino anterior (LCS logic)
-    if (lastStartX == startX && lastStartY == startY && lastGoalX == goalX && lastGoalY == goalY && !lastPath.empty()) {
-        // Validar que el camino anterior sigue siendo válido
-        bool pathValid = true;
-        for (auto [y, x] : lastPath) {
-            if (grid[y*W + x].type == CellType::Wall) {
-                pathValid = false;
-                break;
-            }
-        }
-        
-        if (pathValid) {
-            path = lastPath; // Reutilizar camino cached
-            return;
-        }
+    // Verificar si podemos reutilizar el camino anterior
+    if (lastStartX == startX && lastStartY == startY && lastGoalX == goalX && 
+        lastGoalY == goalY && lastTurnCount == turnCount && !lastPath.empty()) {
+        path = lastPath;
+        return;
     }
-    
-    int tempGoalX = goalX;
-    int tempGoalY = goalY;
-    
-    for (auto& cell : grid) {
-        cell.visited = false;
-        cell.isOnPath = false;
-    }
-    
-    grid[tempGoalY*W + tempGoalX].type = CellType::Goal;
-    goalX = tempGoalX;
-    goalY = tempGoalY;
     
     path.clear();
     
-    // Minimum Coin Change aplicado: usar dp para encontrar costo mínimo
-    vector<vector<int>> cost(H, vector<int>(W, INT_MAX));
-    vector<vector<pair<int,int>>> parent(H, vector<pair<int,int>>(W, {-1,-1}));
-    queue<pair<int,int>> q;
+    // Verificar que tenemos un grid válido
+    if (W <= 0 || H <= 0 || grid.empty()) {
+        cout << "Error: Grid inválido\n";
+        return;
+    }
     
-    cost[startY][startX] = 0; // Costo inicial = 0
-    q.push({startY, startX});
+    // Usar arrays planos para mejor cache locality
+    vector<int> cost(W * H, INT_MAX);
+    vector<int> parentX(W * H, -1);
+    vector<int> parentY(W * H, -1);
+    queue<int> q;
     
-    int dirs[4][2] = {{1,0}, {-1,0}, {0,1}, {0,-1}};
+    int startIdx = startY * W + startX;
+    int goalIdx = goalY * W + goalX;
+    
+    // Verificar índices válidos
+    if (startIdx < 0 || startIdx >= W * H || goalIdx < 0 || goalIdx >= W * H) {
+        cout << "Error: Índices fuera de rango\n";
+        return;
+    }
+    
+    cost[startIdx] = 0;
+    q.push(startIdx);
+    
+    // Direcciones: arriba, abajo, izquierda, derecha
+    int dx[] = {0, 0, -1, 1};
+    int dy[] = {-1, 1, 0, 0};
     bool found = false;
 
-    while (!q.empty()) {
-        auto [y,x] = q.front(); q.pop();
+    while (!q.empty() && !found) {
+        int idx = q.front(); 
+        q.pop();
         
-        if (y == goalY && x == goalX) { 
+        if (idx == goalIdx) { 
             found = true; 
             break; 
         }
         
-        for (auto& d : dirs) {
-            int ny = y + d[0];
-            int nx = x + d[1];
+        int y = idx / W;
+        int x = idx % W;
+        
+        // Explorar las 4 direcciones
+        for (int i = 0; i < 4; i++) {
+            int nx = x + dx[i];
+            int ny = y + dy[i];
             
-            if (!inside(ny,nx)) continue;
-            if (grid[ny*W+nx].type == CellType::Wall) continue;
+            // Verificar límites
+            if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
             
-            // Aplicar costos dinámicos basados en tipo de celda (Coin Change logic)
-            int moveCost = 1; // Costo base
-            if (grid[ny*W+nx].type == CellType::Crystal) moveCost = 3; // Cristales cuestan más
-            if (grid[ny*W+nx].hasBeenTraversed) moveCost = 1; // Celdas ya visitadas son más baratas
+            int newIdx = ny * W + nx;
             
-            int newCost = cost[y][x] + moveCost;
+            // Verificar que el índice sea válido
+            if (newIdx < 0 || newIdx >= W * H) continue;
             
-            // Solo procesar si encontramos un camino más barato (DP optimization)
-            if (newCost < cost[ny][nx]) {
-                cost[ny][nx] = newCost;
-                parent[ny][nx] = {y,x};
-                q.push({ny,nx});
+            // Verificar que no sea muro
+            if (grid[newIdx].type == CellType::Wall) continue;
+            
+            // Calcular costo del movimiento
+            int moveCost = 1;
+            if (grid[newIdx].type == CellType::Crystal) moveCost = 3;
+            else if (grid[newIdx].hasBeenTraversed) moveCost = 1;
+            
+            int newCost = cost[idx] + moveCost;
+            
+            if (newCost < cost[newIdx]) {
+                cost[newIdx] = newCost;
+                parentX[newIdx] = x;
+                parentY[newIdx] = y;
+                q.push(newIdx);
             }
         }
     }
 
-    // Reconstruir camino óptimo
+    // Reconstruir camino si se encontró
     if (found) {
-        for (int cy = goalY, cx = goalX; cy != -1; ) {
-            path.push_back({cy,cx});
-            auto p = parent[cy][cx];
-            cy = p.first; 
-            cx = p.second;
+        path.reserve(W + H); // Estimación conservadora
+        
+        int cx = goalX, cy = goalY;
+        while (cx != -1 && cy != -1) {
+            int idx = cy * W + cx;
+            if (idx < 0 || idx >= W * H) break; // Seguridad adicional
+            
+            path.emplace_back(cy, cx);
+            int px = parentX[idx];
+            int py = parentY[idx];
+            
+            // Prevenir loops infinitos
+            if (px == cx && py == cy) break;
+            
+            cx = px; 
+            cy = py;
         }
         reverse(path.begin(), path.end());
         
-        // Guardar en cache para futura reutilización (LCS optimization)
+        // Guardar en cache
         lastPath = path;
         lastStartX = startX; lastStartY = startY;
-        lastGoalX = tempGoalX; lastGoalY = tempGoalY;
+        lastGoalX = goalX; lastGoalY = goalY;
+        lastTurnCount = turnCount;
+        
+        cout << "Camino encontrado con " << path.size() << " pasos\n";
+    } else {
+        cout << "No se encontró camino hacia la meta\n";
     }
 }
 
+// REEMPLAZAR getCellColor() con versión optimizada (línea ~433):
 sf::Color getCellColor(CellType type, int x, int y, bool visited, bool isOnPath, bool hasBeenTraversed) {
-    // PRIORIDAD 1: Muros siempre son negros
-    if (type == CellType::Wall) return sf::Color(40, 40, 40);
+    // Lookup table estática para colores base
+    static const sf::Color wallColor(40, 40, 40);
+    static const sf::Color crystalColor(0, 255, 255, 180);
+    static const sf::Color goalColor(0, 200, 0, 150);
+    static const sf::Color traversedColor(192, 192, 192, 200);
+    static const sf::Color normalColor1(120, 120, 200, 120);
+    static const sf::Color normalColor2(100, 100, 180, 120);
     
-    // PRIORIDAD 2: Cristales SIEMPRE mantienen su color (incluso si han sido recorridos)
-    if (type == CellType::Crystal) return sf::Color(0, 255, 255, 180);
-    
-    // PRIORIDAD 3: Meta
-    if (type == CellType::Goal) return sf::Color(0, 200, 0, 150);
-    
-    // PRIORIDAD 4: Camino recorrido (solo para celdas Empty y Start)
-    if (hasBeenTraversed && (type == CellType::Empty || type == CellType::Start)) {
-        return sf::Color(192, 192, 192, 200);
+    // Switch optimizado en lugar de ifs secuenciales
+    switch (type) {
+        case CellType::Wall: return wallColor;
+        case CellType::Crystal: return crystalColor;
+        case CellType::Goal: return goalColor;
+        case CellType::Empty:
+        case CellType::Start:
+            return hasBeenTraversed ? traversedColor : 
+                   ((x + y) & 1) ? normalColor2 : normalColor1; // Bitwise AND más rápido
+        default:
+            return ((x + y) & 1) ? normalColor2 : normalColor1;
     }
-    
-    // PRIORIDAD 5: Celdas normales (incluyendo Start no recorrido)
-    return ((x + y) % 2 == 0) ? sf::Color(120, 120, 200, 120) : sf::Color(100, 100, 180, 120);
 }
 
 bool tryMovePlayer(int newX, int newY, int& currentX, int& currentY, sf::CircleShape& player, sf::CircleShape& goal) {
-    if (inside(newY, newX) && grid[newY*W + newX].type != CellType::Wall) {
-        // MARCAR la celda actual ANTES de moverse (incluye la celda de inicio)
-        grid[currentY*W + currentX].hasBeenTraversed = true;
+    // Verificaciones de seguridad
+    if (newX < 0 || newX >= W || newY < 0 || newY >= H) return false;
+    if (grid.empty() || W <= 0 || H <= 0) return false;
+    
+    int newIdx = newY * W + newX;
+    int currentIdx = currentY * W + currentX;
+    
+    if (newIdx < 0 || newIdx >= grid.size()) return false;
+    if (currentIdx < 0 || currentIdx >= grid.size()) return false;
+    
+    if (grid[newIdx].type != CellType::Wall) {
+        // MARCAR la celda actual ANTES de moverse
+        grid[currentIdx].hasBeenTraversed = true;
         
         // Actualizar posición
         currentX = newX;
@@ -465,13 +519,12 @@ bool tryMovePlayer(int newX, int newY, int& currentX, int& currentY, sf::CircleS
         player.setPosition(newPos);
 
         // MARCAR la nueva celda también
-        grid[currentY*W + currentX].hasBeenTraversed = true;
+        grid[newIdx].hasBeenTraversed = true;
         
-        // Solo reflejar cuando el jugador pasa por un cristal (con dirección)
-        if (grid[currentY*W + currentX].type == CellType::Crystal) {
+        // Solo reflejar cuando el jugador pasa por un cristal
+        if (grid[newIdx].type == CellType::Crystal) {
             reflectCrystals(currentX, currentY);
         } else {
-            // Actualizar posición anterior sin activar reflejo
             lastX = currentX;
             lastY = currentY;
         }
@@ -492,28 +545,30 @@ bool tryMovePlayer(int newX, int newY, int& currentX, int& currentY, sf::CircleS
     return false;
 }
 
+// REEMPLAZAR makeTri() con versión optimizada (línea ~516):
 sf::ConvexShape makeTri(int x, int y) {
-    sf::ConvexShape tri;
+    static sf::ConvexShape tri; // Reutilizar objeto
     tri.setPointCount(3);
     
-    const float verticalGap = 8.f;
-    const float horizontalGap = 3.f;
-    bool up = (x + y) % 2 == 0;
+    // Precálculos constantes
+    static const float verticalGap = 8.f;
+    static const float horizontalGap = 3.f;
+    static const float triWidthBase = cellSize - horizontalGap;
+    static const float triHeightBase = cellSize - verticalGap;
+    static const float horizontalStretch = 10.f;
+    static const sf::Color outlineColor(100, 100, 100, 100);
+    
+    bool up = (x + y) & 1; // Bitwise AND más rápido
 
-    float px = x * cellSize + horizontalGap/2;
-    float py = y * cellSize + verticalGap/2;
-    float triWidth = cellSize - horizontalGap;
-    float triHeight = cellSize - verticalGap;
+    float px = x * cellSize + horizontalGap * 0.5f;
+    float py = y * cellSize + verticalGap * 0.5f;
     
-    const float horizontalStretch = 10.f;
-    const float verticalStretch = 0.f;
-    
-    float left = px - horizontalStretch/2;
-    float right = px + triWidth + horizontalStretch/2;
-    float centerX = px + triWidth / 2.f;
+    float left = px - horizontalStretch * 0.5f;
+    float right = px + triWidthBase + horizontalStretch * 0.5f;
+    float centerX = px + triWidthBase * 0.5f;
     
     float top = py;
-    float bottom = py + triHeight + verticalStretch;
+    float bottom = py + triHeightBase;
 
     if (up) {
         tri.setPoint(0, sf::Vector2f(centerX, top));
@@ -526,7 +581,7 @@ sf::ConvexShape makeTri(int x, int y) {
     }
 
     tri.setOutlineThickness(0.5f);
-    tri.setOutlineColor(sf::Color(100, 100, 100, 100));
+    tri.setOutlineColor(outlineColor);
     return tri;
 }
 
@@ -674,16 +729,28 @@ int main() {
                                 break;
                             case 1: // AUTOCOMPLETAR
                                 if (gameState == GameState::Menu || gameState == GameState::Playing) {
+                                    cout << "Iniciando autocompletado desde (" << currentX << "," << currentY << ")\n";
+                                    cout << "Meta en (" << goalX << "," << goalY << ")\n";
+                                    cout << "Grid size: " << W << "x" << H << " = " << grid.size() << " celdas\n";
+                                    
                                     gameState = GameState::Playing;
                                     solved = false;
                                     startY = currentY;
                                     startX = currentX;
+                                    
                                     bfsSolve();
-                                    autoMode = true;
-                                    step = 0;
-                                    currentPos = player.getPosition();
-                                    moveCount = 0;
-                                    gameClock.restart();
+                                    
+                                    if (!path.empty()) {
+                                        autoMode = true;
+                                        step = 0;
+                                        currentPos = player.getPosition();
+                                        moveCount = 0;
+                                        gameClock.restart();
+                                        cout << "Autocompletado iniciado con " << path.size() << " pasos\n";
+                                    } else {
+                                        cout << "Error: No se pudo generar camino para autocompletado\n";
+                                        autoMode = false;
+                                    }
                                 }
                                 break;
                             case 2: // REINICIAR
@@ -930,17 +997,24 @@ int main() {
         
         window.setView(gameView);
 
-        for (int y = 0; y < H; ++y) {
-            for (int x = 0; x < W; ++x) {
-                Cell& cell = grid[y*W + x];
-                sf::ConvexShape tri = makeTri(x, y);
-                tri.setFillColor(getCellColor(cell.type, x, y, cell.visited, cell.isOnPath, cell.hasBeenTraversed));
-                window.draw(tri);
-                
-                if (cell.type == CellType::Crystal) {
-                    sf::ConvexShape crystalTri = makeTri(x, y);
-                    crystalTri.setFillColor(sf::Color(255, 255, 255, 50));
-                    window.draw(crystalTri);
+        // Verificar que tengamos un grid válido antes de renderizar
+        if (W > 0 && H > 0 && !grid.empty()) {
+            for (int y = 0; y < H; ++y) {
+                for (int x = 0; x < W; ++x) {
+                    int idx = y * W + x;
+                    if (idx >= 0 && idx < grid.size()) { // Verificación de seguridad
+                        Cell& cell = grid[idx];
+                        sf::ConvexShape tri = makeTri(x, y);
+                        tri.setFillColor(getCellColor(cell.type, x, y, cell.visited, cell.isOnPath, cell.hasBeenTraversed));
+                        window.draw(tri);
+                        
+                        // Efecto especial para cristales
+                        if (cell.type == CellType::Crystal) {
+                            sf::ConvexShape crystalTri = makeTri(x, y);
+                            crystalTri.setFillColor(sf::Color(255, 255, 255, 50));
+                            window.draw(crystalTri);
+                        }
+                    }
                 }
             }
         }
@@ -948,7 +1022,7 @@ int main() {
         verifyGoal(goal);
         window.draw(goal);
         window.draw(player);
-
+        
         window.setView(menuView);
         
         window.draw(menuBackground);
