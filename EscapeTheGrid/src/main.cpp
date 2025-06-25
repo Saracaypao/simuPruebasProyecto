@@ -7,7 +7,6 @@
 #include <iostream>
 #include <cmath>
 #include <memory>
-#include <unordered_map>
 
 using namespace std;
 
@@ -20,8 +19,6 @@ struct Cell {
     bool visited = false; 
     bool isOnPath = false;
     bool hasBeenTraversed = false;
-    bool isReflected = false;
-    bool isDirty = false;
 };
 
 struct Button {
@@ -93,8 +90,86 @@ float menuWidth = 300.f;
 sf::Vector2f gameOffset(0, 0);
 sf::View gameView, menuView;
 
-// ==================== FUNCIONES DEL JUEGO ====================
+// AGREGAR variables globales para tracking de dirección (línea ~75):
+int lastX = -1, lastY = -1; // Para detectar dirección de movimiento
 
+// ==================== FUNCIONES AUXILIARES ====================
+bool inside(int y, int x) {
+    return x >= 0 && x < W && y >= 0 && y < H;
+}
+
+// ==================== FUNCIONES DE REFLEXIÓN MEJORADAS ====================
+void reflectHorizontally(int crystalX, int crystalY) {
+    // Reflejar todo el lado izquierdo hacia la derecha tal cual
+    for (int x = 0; x < crystalX; x++) {
+        int reflectedX = crystalX + (crystalX - x);
+        if (reflectedX < W) {
+            grid[crystalY*W + reflectedX] = grid[crystalY*W + x];
+        }
+    }
+    
+    // Reflejar todo el lado derecho hacia la izquierda tal cual
+    for (int x = crystalX + 1; x < W; x++) {
+        int reflectedX = crystalX - (x - crystalX);
+        if (reflectedX >= 0) {
+            grid[crystalY*W + reflectedX] = grid[crystalY*W + x];
+        }
+    }
+}
+
+void reflectVertically(int crystalX, int crystalY) {
+    // Reflejar todo el lado superior hacia abajo tal cual
+    for (int y = 0; y < crystalY; y++) {
+        int reflectedY = crystalY + (crystalY - y);
+        if (reflectedY < H) {
+            grid[reflectedY*W + crystalX] = grid[y*W + crystalX];
+        }
+    }
+    
+    // Reflejar todo el lado inferior hacia arriba tal cual
+    for (int y = crystalY + 1; y < H; y++) {
+        int reflectedY = crystalY - (y - crystalY);
+        if (reflectedY >= 0) {
+            grid[reflectedY*W + crystalX] = grid[y*W + crystalX];
+        }
+    }
+}
+
+void reflectDynamically(int crystalX, int crystalY, int directionX, int directionY) {
+    cout << "¡Cristal activado en (" << crystalX << "," << crystalY << ") - Dirección: (" << directionX << "," << directionY << ")\n";
+    
+    // Determinar tipo de reflexión basado en la dirección de entrada
+    if (directionX != 0) {
+        // Movimiento horizontal -> Reflejar horizontalmente
+        reflectHorizontally(crystalX, crystalY);
+        cout << "Reflejo HORIZONTAL activado (movimiento izquierda/derecha)\n";
+    } else if (directionY != 0) {
+        // Movimiento vertical -> Reflejar verticalmente  
+        reflectVertically(crystalX, crystalY);
+        cout << "Reflejo VERTICAL activado (movimiento arriba/abajo)\n";
+    }
+}
+
+void reflectCrystals(int currentX, int currentY) {
+    // Calcular dirección de movimiento
+    int directionX = 0, directionY = 0;
+    
+    if (lastX != -1 && lastY != -1) {
+        directionX = currentX - lastX;
+        directionY = currentY - lastY;
+    }
+    
+    // Verificar si el jugador está en un cristal
+    if (grid[currentY*W + currentX].type == CellType::Crystal) {
+        reflectDynamically(currentX, currentY, directionX, directionY);
+    }
+    
+    // Actualizar posición anterior
+    lastX = currentX;
+    lastY = currentY;
+}
+
+// ==================== RESTANTE DEL CÓDIGO ====================
 void verifyGoal(sf::CircleShape& goal) {
     if (grid[goalY*W + goalX].type != CellType::Goal) {
         grid[goalY*W + goalX].type = CellType::Goal;
@@ -124,45 +199,9 @@ void moveGoal(int currentX, int currentY, sf::CircleShape& goal) {
     }
     
     if (!emptyCells.empty()) {
-        // Algoritmo híbrido: 70% aleatorio, 30% considerando distancia
-        int selectedIndex;
+        int index = rand() % emptyCells.size();
+        auto [newY, newX] = emptyCells[index];
         
-        if (rand() % 100 < 70) {
-            // 70% de las veces: movimiento completamente aleatorio
-            selectedIndex = rand() % emptyCells.size();
-        } else {
-            // 30% de las veces: preferir posiciones no demasiado cerca ni demasiado lejos
-            vector<pair<int, int>> balancedCells;
-            
-            for (size_t i = 0; i < emptyCells.size(); i++) {
-                auto [y, x] = emptyCells[i];
-                int distance = abs(x - currentX) + abs(y - currentY);
-                
-                // Preferir distancias medias (ni muy cerca ni muy lejos)
-                if (distance >= 3 && distance <= 8) {
-                    balancedCells.push_back({y, x});
-                }
-            }
-            
-            if (!balancedCells.empty()) {
-                // Seleccionar aleatoriamente de las posiciones balanceadas
-                int balancedIndex = rand() % balancedCells.size();
-                auto [selectedY, selectedX] = balancedCells[balancedIndex];
-                
-                // Encontrar el índice en emptyCells
-                for (size_t i = 0; i < emptyCells.size(); i++) {
-                    if (emptyCells[i].first == selectedY && emptyCells[i].second == selectedX) {
-                        selectedIndex = i;
-                        break;
-                    }
-                }
-            } else {
-                // Si no hay posiciones balanceadas, seleccionar aleatoriamente
-                selectedIndex = rand() % emptyCells.size();
-            }
-        }
-        
-        auto [newY, newX] = emptyCells[selectedIndex];
         grid[oldGoalY*W + oldGoalX].type = CellType::Empty;
         goalX = newX;
         goalY = newY;
@@ -187,7 +226,17 @@ bool loadMaze(const string& path) {
         return false;
     }
     
-    grid.resize(W * H);
+    // Knapsack optimization: calcular capacidad óptima de memoria
+    int totalCells = W * H;
+    int memoryCapacity = min(totalCells, 2500); // Límite de memoria eficiente
+    
+    // Solo redimensionar si es necesario (evita reallocaciones innecesarias)
+    if (grid.size() != totalCells) {
+        grid.clear();
+        grid.reserve(memoryCapacity); // Reservar memoria óptima
+        grid.resize(totalCells);
+    }
+    
     string line;
     getline(file, line);
     
@@ -260,15 +309,15 @@ void resetGame(sf::CircleShape& goal) {
         cell.visited = false;
         cell.isOnPath = false;
         cell.hasBeenTraversed = false;
-        cell.isReflected = false;
     }
     
     grid[startY*W + startX].hasBeenTraversed = true;
+    
+    // Resetear tracking de posición
+    lastX = startX;
+    lastY = startY;
+    
     verifyGoal(goal);
-}
-
-bool inside(int y, int x) {
-    return x >= 0 && x < W && y >= 0 && y < H;
 }
 
 void triggerMapEvent() {
@@ -285,8 +334,29 @@ void triggerMapEvent() {
     }
 }
 
-// ==================== FUNCIÓN bfsSolve MODIFICADA ====================
+// AGREGAR al inicio de bfsSolve() para cache inteligente:
 void bfsSolve() {
+    // LCS optimization: reutilizar segmentos de caminos anteriores si son similares
+    static vector<pair<int,int>> lastPath;
+    static int lastStartX = -1, lastStartY = -1, lastGoalX = -1, lastGoalY = -1;
+    
+    // Verificar si podemos reutilizar el camino anterior (LCS logic)
+    if (lastStartX == startX && lastStartY == startY && lastGoalX == goalX && lastGoalY == goalY && !lastPath.empty()) {
+        // Validar que el camino anterior sigue siendo válido
+        bool pathValid = true;
+        for (auto [y, x] : lastPath) {
+            if (grid[y*W + x].type == CellType::Wall) {
+                pathValid = false;
+                break;
+            }
+        }
+        
+        if (pathValid) {
+            path = lastPath; // Reutilizar camino cached
+            return;
+        }
+    }
+    
     int tempGoalX = goalX;
     int tempGoalY = goalY;
     
@@ -301,18 +371,19 @@ void bfsSolve() {
     
     path.clear();
     
-    vector<vector<bool>> vis(H, vector<bool>(W, false));
+    // Minimum Coin Change aplicado: usar dp para encontrar costo mínimo
+    vector<vector<int>> cost(H, vector<int>(W, INT_MAX));
     vector<vector<pair<int,int>>> parent(H, vector<pair<int,int>>(W, {-1,-1}));
     queue<pair<int,int>> q;
+    
+    cost[startY][startX] = 0; // Costo inicial = 0
     q.push({startY, startX});
-    vis[startY][startX] = true;
     
     int dirs[4][2] = {{1,0}, {-1,0}, {0,1}, {0,-1}};
     bool found = false;
 
     while (!q.empty()) {
         auto [y,x] = q.front(); q.pop();
-        
         
         if (y == goalY && x == goalX) { 
             found = true; 
@@ -324,33 +395,46 @@ void bfsSolve() {
             int nx = x + d[1];
             
             if (!inside(ny,nx)) continue;
-            if (grid[ny*W+nx].type == CellType::Wall || vis[ny][nx]) continue;
+            if (grid[ny*W+nx].type == CellType::Wall) continue;
             
-            vis[ny][nx] = true;
-            parent[ny][nx] = {y,x};
-            q.push({ny,nx});
+            // Aplicar costos dinámicos basados en tipo de celda (Coin Change logic)
+            int moveCost = 1; // Costo base
+            if (grid[ny*W+nx].type == CellType::Crystal) moveCost = 3; // Cristales cuestan más
+            if (grid[ny*W+nx].hasBeenTraversed) moveCost = 1; // Celdas ya visitadas son más baratas
+            
+            int newCost = cost[y][x] + moveCost;
+            
+            // Solo procesar si encontramos un camino más barato (DP optimization)
+            if (newCost < cost[ny][nx]) {
+                cost[ny][nx] = newCost;
+                parent[ny][nx] = {y,x};
+                q.push({ny,nx});
+            }
         }
     }
 
+    // Reconstruir camino óptimo
     if (found) {
         for (int cy = goalY, cx = goalX; cy != -1; ) {
             path.push_back({cy,cx});
-         
             auto p = parent[cy][cx];
             cy = p.first; 
             cx = p.second;
         }
         reverse(path.begin(), path.end());
+        
+        // Guardar en cache para futura reutilización (LCS optimization)
+        lastPath = path;
+        lastStartX = startX; lastStartY = startY;
+        lastGoalX = tempGoalX; lastGoalY = tempGoalY;
     }
 }
 
-// ==================== FUNCIÓN getCellColor MODIFICADA ====================
-sf::Color getCellColor(CellType type, int x, int y, bool visited, bool isOnPath, bool hasBeenTraversed, bool isReflected) {
+sf::Color getCellColor(CellType type, int x, int y, bool visited, bool isOnPath, bool hasBeenTraversed) {
     if (type == CellType::Crystal) return sf::Color(0, 255, 255, 180);
     
     if (type == CellType::Goal) return sf::Color(0, 200, 0, 150);
     
-    if (isReflected) return sf::Color(150, 220, 255, 200);
     if (hasBeenTraversed) return sf::Color(192, 192, 192, 200);
     
     switch (type) {
@@ -359,109 +443,6 @@ sf::Color getCellColor(CellType type, int x, int y, bool visited, bool isOnPath,
         case CellType::Empty:
         default: 
             return ((x + y) % 2 == 0) ? sf::Color(120, 120, 200, 120) : sf::Color(100, 100, 180, 120);
-    }
-}
-  
-void reflectDFS(int x, int y, int dx, int dy, int sourceX, int sourceY) {
-    int nextX = x + dx;
-    int nextY = y + dy;
-    
-    // Verificar límites
-    if (!inside(nextY, nextX)) return;
-    
-    // Si hay pared, detener
-    if (grid[nextY*W + nextX].type == CellType::Wall) return;
-    
-    // Si la celda fuente está traversed, reflejar
-    if (inside(sourceY, sourceX) && grid[sourceY*W + sourceX].hasBeenTraversed) {
-        grid[nextY*W + nextX].hasBeenTraversed = true;
-        grid[nextY*W + nextX].isReflected = true;
-        
-        // Continuar DFS
-        reflectDFS(nextX, nextY, dx, dy, sourceX - dx, sourceY - dy);
-    }
-}
-
-void reflectFromCrystal(int crystalX, int crystalY) {
-    // Direcciones: izquierda, derecha, arriba, abajo
-    int dirs[4][2] = {{-1,0}, {1,0}, {0,-1}, {0,1}};
-    
-    for (int d = 0; d < 4; d++) {
-        int dx = dirs[d][0];
-        int dy = dirs[d][1];
-        
-        // Buscar celdas traversed en dirección opuesta
-        int sourceX = crystalX - dx;
-        int sourceY = crystalY - dy;
-        
-        // DFS desde el cristal hacia la dirección del reflejo
-        reflectDFS(crystalX, crystalY, dx, dy, sourceX, sourceY);
-    }
-}
-
-void reflectCrystals() {
-    for (auto& c : grid) {
-        c.isReflected = false;
-    }
-
-    for (int y = 0; y < H; ++y) {
-        for (int x = 0; x < W; ++x) {
-            if (grid[y*W + x].type != CellType::Crystal) 
-                continue;
-
-            // DFS optimizado para reflejos horizontales y verticales
-            reflectFromCrystal(x, y);
-        }
-    }
-}
-
-void optimizedReflectCrystals() {
-    // Reset solo las celdas reflejadas previamente
-    static vector<pair<int,int>> previouslyReflected;
-    for (auto [x, y] : previouslyReflected) {
-        grid[y*W + x].isReflected = false;
-        grid[y*W + x].isDirty = true;
-    }
-    previouslyReflected.clear();
-    
-    // Usar queue en lugar de recursión para evitar stack overflow
-    for (int y = 0; y < H; ++y) {
-        for (int x = 0; x < W; ++x) {
-            if (grid[y*W + x].type != CellType::Crystal) continue;
-            
-            // Flood fill iterativo
-            queue<pair<int,int>> q;
-            int dirs[4][2] = {{-1,0}, {1,0}, {0,-1}, {0,1}};
-            
-            for (int d = 0; d < 4; d++) {
-                int dx = dirs[d][0];
-                int dy = dirs[d][1];
-                
-                q.push({x, y});
-                
-                while (!q.empty()) {
-                    auto [cx, cy] = q.front();
-                    q.pop();
-                    
-                    int nextX = cx + dx;
-                    int nextY = cy + dy;
-                    
-                    if (!inside(nextY, nextX)) break;
-                    if (grid[nextY*W + nextX].type == CellType::Wall) break;
-                    
-                    int sourceX = cx - dx;
-                    int sourceY = cy - dy;
-                    
-                    if (inside(sourceY, sourceX) && grid[sourceY*W + sourceX].hasBeenTraversed) {
-                        grid[nextY*W + nextX].hasBeenTraversed = true;
-                        grid[nextY*W + nextX].isReflected = true;
-                        grid[nextY*W + nextX].isDirty = true;
-                        previouslyReflected.push_back({nextX, nextY});
-                        q.push({nextX, nextY});
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -476,7 +457,15 @@ bool tryMovePlayer(int newX, int newY, int& currentX, int& currentY, sf::CircleS
         player.setPosition(newPos);
 
         grid[currentY*W + currentX].hasBeenTraversed = true;
-        reflectCrystals();
+        
+        // Solo reflejar cuando el jugador pasa por un cristal (con dirección)
+        if (grid[currentY*W + currentX].type == CellType::Crystal) {
+            reflectCrystals(currentX, currentY);
+        } else {
+            // Actualizar posición anterior sin activar reflejo
+            lastX = currentX;
+            lastY = currentY;
+        }
 
         turnCount++;
         turnsSinceLastGoalMove++;
@@ -532,8 +521,6 @@ sf::ConvexShape makeTri(int x, int y) {
     return tri;
 }
 
-
-
 sf::Text createStyledText(const string& text, sf::Font& font, int size, sf::Color color, float x, float y) {
     sf::Text styledText(text, font, size);
     styledText.setFillColor(color);
@@ -563,138 +550,7 @@ void updateViews(sf::RenderWindow& window) {
     menuView.setViewport(sf::FloatRect(gameViewWidth / windowSize.x, 0, menuWidth / windowSize.x, 1.0f));
 }
 
-int calculateMinMoves() {
-    // DP para calcular mínimo número de movimientos
-    vector<vector<int>> dp(H, vector<int>(W, INT_MAX));
-    dp[startY][startX] = 0;
-    
-    queue<pair<int,int>> q;
-    q.push({startY, startX});
-    
-    while (!q.empty()) {
-        auto [y, x] = q.front();
-        q.pop();
-        
-        if (y == goalY && x == goalX) {
-            return dp[y][x];
-        }
-        
-        int dirs[4][2] = {{1,0}, {-1,0}, {0,1}, {0,-1}};
-        
-        for (auto& d : dirs) {
-            int ny = y + d[0];
-            int nx = x + d[1];
-            
-            if (inside(ny, nx) && grid[ny*W + nx].type != CellType::Wall) {
-                int newCost = dp[y][x] + 1;
-                
-                // Considerar costo adicional por eventos cada 5 movimientos
-                if ((newCost % TURNS_PER_EVENT) == 0) {
-                    newCost += 2; // Penalización por evento
-                }
-                
-                if (newCost < dp[ny][nx]) {
-                    dp[ny][nx] = newCost;
-                    q.push({ny, nx});
-                }
-            }
-        }
-    }
-    
-    return -1; // No hay camino
-}
-
-class SpatialHash {
-private:
-    unordered_map<int, vector<pair<int,int>>> grid;
-    int cellSize;
-    
-public:
-    SpatialHash(int size) : cellSize(size) {}
-    
-    int hash(int x, int y) {
-        return (x / cellSize) * 1000 + (y / cellSize);
-    }
-    
-    void insert(int x, int y) {
-        grid[hash(x, y)].push_back({x, y});
-    }
-    
-    vector<pair<int,int>> getNearby(int x, int y) {
-        vector<pair<int,int>> nearby;
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                int key = hash(x + dx * cellSize, y + dy * cellSize);
-                if (grid.count(key)) {
-                    nearby.insert(nearby.end(), grid[key].begin(), grid[key].end());
-                }
-            }
-        }
-        return nearby;
-    }
-};
-
-class ResourceManager {
-private:
-    static unordered_map<string, sf::Font> fonts;
-    static unordered_map<string, sf::Texture> textures;
-    static sf::Font defaultFont;
-    
-public:
-    static sf::Font& getFont(const string& path) {
-        // Verificar si ya está en caché
-        if (fonts.find(path) != fonts.end()) {
-            return fonts[path];
-        }
-        
-        // Intentar cargar la fuente
-        sf::Font font;
-        if (font.loadFromFile(path)) {
-            fonts[path] = font;
-            cout << "Fuente cargada exitosamente: " << path << endl;
-            return fonts[path];
-        } else {
-            cout << "Error cargando fuente: " << path << endl;
-            // Retornar fuente por defecto si falla
-            return getDefaultFont();
-        }
-    }
-    
-    static sf::Font& getDefaultFont() {
-        if (defaultFont.getInfo().family.empty()) {
-            // Intentar cargar fuente por defecto del sistema
-            if (!defaultFont.loadFromFile("C:/Windows/Fonts/arial.ttf")) {
-                // En Linux/Mac podrías usar /usr/share/fonts/...
-                cout << "No se pudo cargar fuente por defecto" << endl;
-            }
-        }
-        return defaultFont;
-    }
-    
-    static void loadSystemFont() {
-        getDefaultFont();
-    }
-    
-    static size_t getCacheSize() {
-        return fonts.size() + textures.size();
-    }
-    
-    static void clearCache() {
-        fonts.clear();
-        textures.clear();
-        cout << "Caché de recursos limpiado" << endl;
-    }
-};
-
-// Definiciones estáticas
-unordered_map<string, sf::Font> ResourceManager::fonts;
-unordered_map<string, sf::Texture> ResourceManager::textures;
-sf::Font ResourceManager::defaultFont;
-
 int main() {
-    // Inicializar generador de números aleatorios
-    srand(time(nullptr));
-    
     if (!loadMaze("../assets/maze.txt") && !loadMaze("assets/maze.txt") && !loadMaze("maze.txt")) {
         createDefaultMaze();
     }
@@ -708,24 +564,18 @@ int main() {
     
     updateViews(window);
     
-    // USAR ResourceManager en lugar de carga directa
-    sf::Font& font = ResourceManager::getFont("../assets/arial.ttf");
-    if (font.getInfo().family.empty()) {
-        // Fallback si no se encuentra el archivo
-        sf::Font& fallbackFont = ResourceManager::getFont("assets/arial.ttf");
-        if (fallbackFont.getInfo().family.empty()) {
-            // Si tampoco encuentra el fallback, usar fuente del sistema
-            ResourceManager::loadSystemFont();
-        }
+    sf::Font font;
+    if (!font.loadFromFile("../assets/arial.ttf") && !font.loadFromFile("assets/arial.ttf")) {
+        cerr << "Error cargando fuente" << endl;
+        return 1;
     }
-    
+
     sf::RectangleShape menuBackground(sf::Vector2f(menuWidth, 2000));
     menuBackground.setPosition(0, 0);
     menuBackground.setFillColor(sf::Color(25, 25, 35, 240));
     menuBackground.setOutlineThickness(2.f);
     menuBackground.setOutlineColor(sf::Color(100, 100, 150, 150));
 
-    
     sf::Text titleText("ESCAPE THE GRID", font, 24);
     titleText.setFillColor(sf::Color(150, 255, 255));
     sf::FloatRect titleBounds = titleText.getLocalBounds();
@@ -776,6 +626,10 @@ int main() {
     int currentX = startX, currentY = startY;
     int moveCount = 0;
     
+    // Inicializar tracking de posición
+    lastX = startX;
+    lastY = startY;
+
     grid[startY*W + startX].hasBeenTraversed = true;
 
     while (window.isOpen()) {
@@ -833,7 +687,6 @@ int main() {
                                 solved = false;
                                 autoMode = false;
                                 gameState = GameState::Menu;
-                                
                                 break;
                         }
                         break;
@@ -920,7 +773,6 @@ int main() {
                     solved = false;
                     autoMode = false;
                     gameState = GameState::Menu;
-
                 }
             }
         }
@@ -934,7 +786,22 @@ int main() {
 
             sf::Vector2f direction = nextPos - currentPos;
             float distance = sqrt(direction.x*direction.x + direction.y*direction.y);
-            float animationSpeed = 5.f;
+            
+            // Rod Cutting optimization: dividir la animación en segmentos óptimos
+            vector<int> framePrices = {1, 3, 4, 5}; // Valores de eficiencia por frame
+            int totalFrames = max(1, (int)(distance / 2.0f));
+            
+            // Calcular división óptima de frames usando Rod Cutting
+            vector<int> dp(totalFrames + 1, 0);
+            for (int i = 1; i <= totalFrames; i++) {
+                for (int j = 1; j <= min(i, (int)framePrices.size()); j++) {
+                    dp[i] = max(dp[i], framePrices[j-1] + dp[i-j]);
+                }
+            }
+            
+            // Usar velocidad adaptativa basada en la división óptima
+            float optimalSpeed = 2.0f + (dp[totalFrames] * 0.1f);
+            float animationSpeed = min(optimalSpeed, 6.0f); // Límite máximo
 
             if (distance > 1.f) {
                 direction /= distance;
@@ -947,7 +814,15 @@ int main() {
                 currentY = y;
 
                 grid[y*W + x].hasBeenTraversed = true;
-                reflectCrystals();
+                
+                // Solo reflejar cuando el jugador pasa por un cristal (con dirección)
+                if (grid[y*W + x].type == CellType::Crystal) {
+                    reflectCrystals(currentX, currentY);
+                } else {
+                    // Actualizar posición anterior sin activar reflejo
+                    lastX = currentX;
+                    lastY = currentY;
+                }
 
                 turnCount++;
                 turnsSinceLastGoalMove++;
@@ -1000,7 +875,6 @@ int main() {
         
         sf::Vector2u windowSize = window.getSize();
         
-
         movesText.setString("Movimientos: " + to_string(moveCount));
         timeText.setString("Tiempo: " + to_string(minutes) + ":" + (seconds < 10 ? "0" : "") + to_string(seconds));
         
@@ -1018,7 +892,6 @@ int main() {
                 statusText.setFillColor(sf::Color(150, 255, 150));
                 break;
         }
-
         
         sf::FloatRect statusBounds = statusText.getLocalBounds();
         statusText.setPosition((menuWidth - statusBounds.width) / 2.f, windowSize.y - 60);
@@ -1037,7 +910,7 @@ int main() {
             for (int x = 0; x < W; ++x) {
                 Cell& cell = grid[y*W + x];
                 sf::ConvexShape tri = makeTri(x, y);
-                tri.setFillColor(getCellColor(cell.type, x, y, cell.visited, cell.isOnPath, cell.hasBeenTraversed, cell.isReflected));
+                tri.setFillColor(getCellColor(cell.type, x, y, cell.visited, cell.isOnPath, cell.hasBeenTraversed));
                 window.draw(tri);
                 
                 if (cell.type == CellType::Crystal) {
@@ -1055,23 +928,18 @@ int main() {
         window.setView(menuView);
         
         window.draw(menuBackground);
-        
-        
         window.draw(titleText);
         
-
         for (auto& button : buttons) {
             button->draw(window);
         }
         
-
         window.draw(infoTitle);
         for (auto& text : infoTexts) window.draw(text);
         
         window.draw(controlsTitle);
         for (auto& text : controlTexts) window.draw(text);
         
-
         window.draw(statusText);
         window.draw(movesText);
         window.draw(timeText);
