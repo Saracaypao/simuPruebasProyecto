@@ -311,6 +311,7 @@ void resetGame(sf::CircleShape& goal) {
         cell.hasBeenTraversed = false;
     }
     
+    // ASEGURAR que la celda de inicio se marca como recorrida desde el principio
     grid[startY*W + startX].hasBeenTraversed = true;
     
     // Resetear tracking de posición
@@ -431,23 +432,30 @@ void bfsSolve() {
 }
 
 sf::Color getCellColor(CellType type, int x, int y, bool visited, bool isOnPath, bool hasBeenTraversed) {
+    // PRIORIDAD 1: Muros siempre son negros
+    if (type == CellType::Wall) return sf::Color(40, 40, 40);
+    
+    // PRIORIDAD 2: Cristales SIEMPRE mantienen su color (incluso si han sido recorridos)
     if (type == CellType::Crystal) return sf::Color(0, 255, 255, 180);
     
+    // PRIORIDAD 3: Meta
     if (type == CellType::Goal) return sf::Color(0, 200, 0, 150);
     
-    if (hasBeenTraversed) return sf::Color(192, 192, 192, 200);
-    
-    switch (type) {
-        case CellType::Wall: return sf::Color(40, 40, 40);
-        case CellType::Start: return sf::Color(100, 255, 100, 200);
-        case CellType::Empty:
-        default: 
-            return ((x + y) % 2 == 0) ? sf::Color(120, 120, 200, 120) : sf::Color(100, 100, 180, 120);
+    // PRIORIDAD 4: Camino recorrido (solo para celdas Empty y Start)
+    if (hasBeenTraversed && (type == CellType::Empty || type == CellType::Start)) {
+        return sf::Color(192, 192, 192, 200);
     }
+    
+    // PRIORIDAD 5: Celdas normales (incluyendo Start no recorrido)
+    return ((x + y) % 2 == 0) ? sf::Color(120, 120, 200, 120) : sf::Color(100, 100, 180, 120);
 }
 
 bool tryMovePlayer(int newX, int newY, int& currentX, int& currentY, sf::CircleShape& player, sf::CircleShape& goal) {
     if (inside(newY, newX) && grid[newY*W + newX].type != CellType::Wall) {
+        // MARCAR la celda actual ANTES de moverse (incluye la celda de inicio)
+        grid[currentY*W + currentX].hasBeenTraversed = true;
+        
+        // Actualizar posición
         currentX = newX;
         currentY = newY;
         sf::Vector2f newPos(
@@ -456,6 +464,7 @@ bool tryMovePlayer(int newX, int newY, int& currentX, int& currentY, sf::CircleS
         );
         player.setPosition(newPos);
 
+        // MARCAR la nueva celda también
         grid[currentY*W + currentX].hasBeenTraversed = true;
         
         // Solo reflejar cuando el jugador pasa por un cristal (con dirección)
@@ -630,6 +639,7 @@ int main() {
     lastX = startX;
     lastY = startY;
 
+    // ASEGURAR que la celda de inicio SIEMPRE esté marcada
     grid[startY*W + startX].hasBeenTraversed = true;
 
     while (window.isOpen()) {
@@ -658,6 +668,8 @@ int main() {
                                 gameState = GameState::Playing;
                                 autoMode = false;
                                 solved = false;
+                                // ASEGURAR que la celda actual esté marcada al empezar a jugar
+                                grid[currentY*W + currentX].hasBeenTraversed = true;
                                 gameClock.restart();
                                 break;
                             case 1: // AUTOCOMPLETAR
@@ -687,6 +699,11 @@ int main() {
                                 solved = false;
                                 autoMode = false;
                                 gameState = GameState::Menu;
+                                
+                                // ASEGURAR que la celda de inicio esté marcada después del reinicio
+                                grid[startY*W + startX].hasBeenTraversed = true;
+                                lastX = startX;
+                                lastY = startY;
                                 break;
                         }
                         break;
@@ -808,11 +825,18 @@ int main() {
                 currentPos += direction * animationSpeed * dt * cellSize;
                 player.setPosition(currentPos);
             } else {
+                // MARCAR la celda anterior ANTES de moverse
+                if (step > 0) { // Solo si no es el primer paso
+                    auto [prevY, prevX] = path[step - 1];
+                    grid[prevY*W + prevX].hasBeenTraversed = true;
+                }
+                
                 currentPos = nextPos;
                 player.setPosition(currentPos);
                 currentX = x;
                 currentY = y;
 
+                // MARCAR la nueva celda
                 grid[y*W + x].hasBeenTraversed = true;
                 
                 // Solo reflejar cuando el jugador pasa por un cristal (con dirección)
