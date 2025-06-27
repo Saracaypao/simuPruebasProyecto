@@ -34,7 +34,7 @@ No se requiere ninguna dependencia extra ni configuración compleja:
    - Pulsar **REINICIAR** para volver al estado inicial del nivel.
 
 2. **Desplazamiento manual**  
-   - Mover la pieza celeste clicando sobre una casilla adyacente libre.  
+   - Mover la pieza celeste dando clic sobre una casilla adyacente libre.  
    - Alternativamente, usar **las flechas del teclado** (↑ ↓ ← →) para avanzar en la dirección deseada.
 
 3. **Modo automático**  
