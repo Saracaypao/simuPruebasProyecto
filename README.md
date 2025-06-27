@@ -59,10 +59,10 @@ No se requiere ninguna dependencia extra ni configuración compleja:
 ## GIFs
 
 - **Juego normal**
-  ![Juego](https://media.giphy.com/media/McJuiH1q4aQjDzNJlS/giphy.gif)
+1. ![Juego](https://media.giphy.com/media/McJuiH1q4aQjDzNJlS/giphy.gif)
 - **Juego normal y presionando la tecla Enter**  
-  ![Juego+Enter](https://media.giphy.com/media/gpOtJrjBl01hYA9x9n/giphy.gif)
+2. ![Juego+Enter](https://media.giphy.com/media/gpOtJrjBl01hYA9x9n/giphy.gif)
 - **Juego autocompletado y presionando la opción de Reiniciar**
-  ![Juego autocompletado+Reiniciar](https://media.giphy.com/media/ksCOxPhj2aioOwfPuO/giphy.gif)   
+3. ![Juego autocompletado+Reiniciar](https://media.giphy.com/media/ksCOxPhj2aioOwfPuO/giphy.gif)   
 
 
