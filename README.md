@@ -56,10 +56,13 @@ No se requiere ninguna dependencia extra ni configuración compleja:
   - **AUTOCOMPLETAR**: mostrar solución automática.  
   - **REINICIAR**: volver al inicio del nivel.
  
-  ## GIFs
+## GIFs
 
-- ![Juego](https://media.giphy.com/media/McJuiH1q4aQjDzNJlS/giphy.gif)  
-- ![Juego+Enter](https://media.giphy.com/media/gpOtJrjBl01hYA9x9n/giphy.gif) 
+- **Juego normal**
+- ![Juego](https://media.giphy.com/media/McJuiH1q4aQjDzNJlS/giphy.gif)
+- **Juego normal y presionando la tecla Enter**  
+- ![Juego+Enter](https://media.giphy.com/media/gpOtJrjBl01hYA9x9n/giphy.gif)
+- **Juego autocompletado y presionando la opción de Reiniciar**
 - ![Juego autocompletado+Reiniciar](https://media.giphy.com/media/ksCOxPhj2aioOwfPuO/giphy.gif)   
 
 
