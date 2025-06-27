@@ -1,6 +1,6 @@
 # Escape the Grid
 
-Escape the Grid es un juego de puzzle sobre una cuadrícula 2D en el que el jugador debe guiar a su avatar desde el punto de inicio hasta la meta, sorteando obstáculos y aprovechando mecánicas especiales. En la variante “Cuevas de Cristal”, el tablero incorpora cristales reflectantes que duplican tu ruta en horizontal o vertical, y cada cierto número de movimientos el mapa o la posición de la salida pueden alterarse, añadiendo un reto dinámico.
+Escape the Grid es un juego de puzzle en una cuadrícula 2D compuesta por triángulos. El jugador guía un circulo celeste desde el punto de inicio hasta la salida verde, sorteando muros negros/grises y aprovechando cristales color cyan que reflejan los movimientos en horizontal o vertical. En la variante “Cuevas de Cristal”, cada cierto número de pasos el tablero o la posición de la meta pueden cambiar, sumando un desafío dinámico.
 
 ## Descripción general del juego
 
