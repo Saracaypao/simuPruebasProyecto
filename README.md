@@ -4,8 +4,8 @@ Escape the Grid es un juego de puzzle sobre una cuadrícula 2D en el que el juga
 
 ## Descripción general del juego
 
-- **Jugador (triángulo celeste)**: la pieza que controlas.  
-- **Meta (botón verde)**: el destino que debes alcanzar.  
+- **Jugador (circulo celeste)**: la pieza que controlas.  
+- **Meta (circulo verde)**: el destino que debes alcanzar.  
 - **Muros (triángulos negros/grises)**: casillas infranqueables.  
 - **Cristales (triángulos cyan)**: al atravesarlos, reflejan automáticamente el recorrido que hayas hecho a su izquierda hacia la derecha (o de arriba hacia abajo), creando movimientos extra que pueden afectar el tablero.
 
