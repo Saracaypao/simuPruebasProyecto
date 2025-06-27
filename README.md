@@ -4,58 +4,55 @@ Escape the Grid es un juego de puzzle sobre una cuadrícula 2D en el que el juga
 
 ## Descripción general del juego
 
-Al arrancar, el jugador se encuentra ante un tablero formado por celdas que pueden contener:
+- **Jugador (triángulo celeste)**: la pieza que controlas.  
+- **Meta (botón verde)**: el destino que debes alcanzar.  
+- **Muros (triángulos negros/grises)**: casillas infranqueables.  
+- **Cristales (triángulos cyan)**: al atravesarlos, reflejan automáticamente el recorrido que hayas hecho a su izquierda hacia la derecha (o de arriba hacia abajo), creando movimientos extra que pueden afectar el tablero.
 
-- **S (Start)**: punto de partida.  
-- **G (Goal)**: meta que hay que alcanzar.  
-- **# (Wall)**: obstáculos infranqueables.  
-- **K (Key)**: elementos opcionales que suman puntos si se recogen.  
-- **C (Crystal)**: al atravesar su casilla, el camino recorrido a la izquierda se “refleja” automáticamente hacia la derecha (o de arriba hacia abajo), creando copias de desplazamientos que pueden abrir o bloquear rutas.
-
-El objetivo principal es llevar la pieza desde **S** hasta **G** con el menor número de pasos posible, explorando manualmente o utilizando el modo de resolución automática. La presencia de cristales y el posible “rebalanceo” del mapa tras ciertos turnos obliga a replantear la estrategia y a adaptarse a cambios inesperados.
+El reto consiste en encontrar la ruta más eficiente desde tu triángulo celeste hasta el botón verde, recogiendo opcionalmente llaves o cristales y adaptándote a los cambios de mapa que se producen tras un número determinado de movimientos.
 
 ## Instrucciones de compilación y ejecución
 
 No se requiere ninguna dependencia extra ni configuración compleja:
 
 1. **Ubicar el ejecutable**  
-   - En **Windows**, encontrar `EscapeTheGrid.exe` en el Escritorio o en la carpeta de descargas.  
-   - En **Linux/macOS** (si la extensión cambia) ubicar el binario equivalente.
-
-2. **Ejecutar la aplicación**  
-   - **Doble clic** sobre el icono en el Escritorio.  
+   - Primero, abrir la carpeta donde se descargó el proyecto; a continuación, dentro de esa carpeta, localizar el archivo `EscapeTheGrid.exe`.
+     
+3. **Ejecutar la aplicación**  
+   - **Doble clic** sobre el ejecutable `EscapeTheGrid.exe`.  
    - O bien abrir una terminal, situarse en la carpeta que contiene `EscapeTheGrid.exe` y escribir:
      ```bash
      ./EscapeTheGrid.exe
      ```
-   Tras unos segundos de carga, aparecerá la ventana principal con el tablero listo para jugar.
+  Tras unos instantes, se abrirá la ventana principal con el tablero listo para jugar.
 
 ## Cómo jugar
 
-1. **Selección de nivel**  
-   - Al iniciarse, el juego muestra un menú para elegir un puzzle predefinido o cargar un archivo de mapa personalizado.  
-2. **Modo manual**  
-   - El jugador hace **clic** en una casilla adyacente libre para mover la pieza.  
-   - Cada paso actualiza la posición y, si se atraviesa un cristal, se reflejarán movimientos extra.  
+1. **Pantalla de inicio**  
+   - Pulsar **JUGAR** para comenzar el nivel actual.  
+   - Pulsar **AUTOCOMPLETAR** para que el juego muestre automáticamente la solución óptima.  
+   - Pulsar **REINICIAR** para volver al estado inicial del nivel.
+
+2. **Desplazamiento manual**  
+   - Mover la pieza celeste clicando sobre una casilla adyacente libre.  
+   - Alternativamente, usar **las flechas del teclado** (↑ ↓ ← →) para avanzar en la dirección deseada.
+
 3. **Modo automático**  
-   - Pulsar **“Resolver”** para que el programa aplique el algoritmo elegido (BFS, A*, etc.).  
-   - La secuencia óptima se despliega paso a paso, con opción de pausar o avanzar manualmente.  
-4. **Eventos dinámicos**  
-   - Tras un número de turnos que se muestra en pantalla, el mapa puede “rotar” o cambiar la posición de **G**, obligando a recalcular la ruta sobre la marcha.
+   - Una vez en juego, pulsar **ENTER** o el botón **AUTOCOMPLETAR**.  
+   - La ruta óptima aparece paso a paso; usar **la flecha derecha** o el botón **Siguiente paso** si quieres avanzar manualmente.
+
+4. **Dinámica de cristales y cambios de mapa**  
+   - Cada vez que pases sobre un cristal cyan, tus últimos pasos a la izquierda se reflejarán hacia la derecha (o de arriba hacia abajo).  
+   - Tras un contador de movimientos visible en pantalla, el diseño del tablero o la posición de la meta verde puede alterarse, exigiendo un nuevo cálculo de ruta.
 
 ## Controles
 
-- **Clic izquierdo sobre celda adyacente**: mover al avatar.  
-- **Botón “Resolver”**: iniciar la búsqueda automática de la ruta más corta.  
-- **Botón “Siguiente paso”**: avanzar un paso en la solución automática.  
-- **Botón “Reiniciar”**: volver al estado inicial del nivel o recargar un nuevo mapa.  
+- **Flechas del teclado** (↑ ↓ ← →): mover al jugador.  
+- **Clic izquierdo** sobre triángulo adyacente: mover al jugador.  
+- **ENTER**: iniciar o pausar la solución automática.  
+- **R**: reiniciar el nivel actual.  
+- **Botones en pantalla**:  
+  - **JUGAR**: comenzar partida manual.  
+  - **AUTOCOMPLETAR**: mostrar solución automática.  
+  - **REINICIAR**: volver al inicio del nivel.
 
-> *Nota:* todos los comandos se realizan con el ratón; no hay atajos de teclado por defecto.
-
-## Capturas de pantalla (recomendado)
-
-Para enriquecer la documentación, incluir imágenes o GIFs ilustrativos:
-
-1. **Tablero inicial** con todos los elementos (S, G, paredes, cristales).  
-2. **Movimiento manual**, mostrando un ejemplo de clic y desplazamiento.  
-3. **Solución automática** paso a paso, idealmente en formato GIF.  
