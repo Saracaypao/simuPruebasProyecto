@@ -39,7 +39,7 @@ No se requiere ninguna dependencia extra ni configuración compleja:
 
 3. **Modo automático**  
    - Una vez en juego, pulsar **ENTER** o el botón **AUTOCOMPLETAR**.  
-   - La ruta óptima aparece paso a paso; usar **la flecha derecha** o el botón **Siguiente paso** si quieres avanzar manualmente.
+   - La ruta óptima aparece ilustrada paso a paso.
 
 4. **Dinámica de cristales y cambios de mapa**  
    - Cada vez que pases sobre un cristal cyan, tus últimos pasos a la izquierda se reflejarán hacia la derecha (o de arriba hacia abajo).  
