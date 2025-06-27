@@ -55,4 +55,11 @@ No se requiere ninguna dependencia extra ni configuración compleja:
   - **JUGAR**: comenzar partida manual.  
   - **AUTOCOMPLETAR**: mostrar solución automática.  
   - **REINICIAR**: volver al inicio del nivel.
+ 
+  ## GIFs
+
+- ![Juego](https://media.giphy.com/media/McJuiH1q4aQjDzNJlS/giphy.gif)  
+- ![Juego+Enter](https://media.giphy.com/media/gpOtJrjBl01hYA9x9n/giphy.gif) 
+- ![Juego autocompletado+Reiniciar](https://media.giphy.com/media/ksCOxPhj2aioOwfPuO/giphy.gif)   
+
 
