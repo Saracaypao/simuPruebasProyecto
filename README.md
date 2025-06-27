@@ -42,14 +42,14 @@ No se requiere ninguna dependencia extra ni configuración compleja:
    - La ruta óptima aparece ilustrada paso a paso.
 
 4. **Dinámica de cristales y cambios de mapa**  
-   - Cada vez que pases sobre un cristal cyan, tus últimos pasos a la izquierda se reflejarán hacia la derecha (o de arriba hacia abajo).  
+   - Cada vez que pases sobre un cristal color cyan, tu camino de la izquierda se reflejará hacia la derecha (o de arriba hacia abajo).  
    - Tras un contador de movimientos visible en pantalla, el diseño del tablero o la posición de la meta verde puede alterarse, exigiendo un nuevo cálculo de ruta.
 
 ## Controles
 
 - **Flechas del teclado** (↑ ↓ ← →): mover al jugador.  
 - **Clic izquierdo** sobre triángulo adyacente: mover al jugador.  
-- **ENTER**: iniciar o pausar la solución automática.  
+- **ENTER**: iniciar la solución automática luego de haber seleccionado "jugar".  
 - **R**: reiniciar el nivel actual.  
 - **Botones en pantalla**:  
   - **JUGAR**: comenzar partida manual.  
