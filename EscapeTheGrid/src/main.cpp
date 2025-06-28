@@ -33,7 +33,7 @@ struct Button {
         shape.setOutlineThickness(2.f);
         shape.setOutlineColor(sf::Color(255, 255, 255, 100));
         
-        text = sf::Text(label, font, 16);
+        text = sf::Text(label, font, 12);
         text.setFillColor(sf::Color::White);
         
         sf::FloatRect textBounds = text.getLocalBounds();
@@ -79,46 +79,296 @@ class TitleScreen {
 private:
     sf::Font font;
     sf::Text titleText;
-    sf::Text pressStartText;
+    sf::Text subtitleText;
+    sf::Text instructionText;
+    sf::Text creditText;
+    sf::Text playerText;
+    sf::Clock animationClock;
     sf::Clock blinkClock;
+    vector<sf::CircleShape> particles;
+    vector<sf::Vector2f> particleVelocities;
+    sf::RectangleShape backgroundGradient;
+    sf::RectangleShape startButton;
+    sf::Text startButtonText;
+    bool buttonHovered = false;
+    
+    void initParticles(sf::Vector2u windowSize = sf::Vector2u(1200, 800)) {
+        particles.clear();
+        particleVelocities.clear();
+        
+        // Ajustar número de partículas basado en el área de la pantalla
+        int particleCount = min(150, max(50, (int)((windowSize.x * windowSize.y) / 15000)));
+        
+        for (int i = 0; i < particleCount; i++) {
+            sf::CircleShape particle(1.f + rand() % 3);
+            particle.setFillColor(sf::Color(
+                150 + rand() % 106,
+                200 + rand() % 56,
+                255,
+                80 + rand() % 176
+            ));
+            particle.setPosition(rand() % windowSize.x, rand() % windowSize.y);
+            particles.push_back(particle);
+            
+            particleVelocities.push_back(sf::Vector2f(
+                (rand() % 20 - 10) / 15.f,
+                (rand() % 20 - 10) / 15.f
+            ));
+        }
+    }
     
 public:
     TitleScreen(sf::Font& gameFont) {
         font = gameFont;
         
-        // Main title
+        // Fondo estilo arcade - se ajustará dinámicamente
+        backgroundGradient.setSize(sf::Vector2f(1200, 800));
+        backgroundGradient.setFillColor(sf::Color(5, 5, 15));
+        
+        // Título principal estilo arcade - tamaño base, se escalará dinámicamente
         titleText.setString("ESCAPE THE GRID");
         titleText.setFont(font);
-        titleText.setCharacterSize(48);
-        titleText.setFillColor(sf::Color(150, 255, 255));
+        titleText.setCharacterSize(32);
+        titleText.setFillColor(sf::Color(180, 220, 255));
         titleText.setStyle(sf::Text::Bold);
-        sf::FloatRect bounds = titleText.getLocalBounds();
-        titleText.setOrigin(bounds.width/2, bounds.height/2);
         
-        // Blinking text
-        pressStartText.setString("PRESS ANY KEY TO START");
-        pressStartText.setFont(font);
-        pressStartText.setCharacterSize(24);
-        pressStartText.setFillColor(sf::Color::White);
-        bounds = pressStartText.getLocalBounds();
-        pressStartText.setOrigin(bounds.width/2, bounds.height/2);
+        // Subtítulo descriptivo - tamaño base, se escalará dinámicamente
+        subtitleText.setString("CRYSTAL MAZE ADVENTURE");
+        subtitleText.setFont(font);
+        subtitleText.setCharacterSize(12);
+        subtitleText.setFillColor(sf::Color(100, 255, 255));
+        
+        // Player info - tamaño base, se escalará dinámicamente
+        playerText.setString("1P\n00");
+        playerText.setFont(font);
+        playerText.setCharacterSize(12);
+        playerText.setFillColor(sf::Color(255, 100, 100));
+        
+        // Botón estilo arcade - tamaño base, se escalará dinámicamente
+        startButton.setSize(sf::Vector2f(300, 50));
+        startButton.setFillColor(sf::Color(50, 50, 150, 200));
+        startButton.setOutlineThickness(3.f);
+        startButton.setOutlineColor(sf::Color(255, 255, 100, 180));
+        
+        startButtonText.setString("CLICK TO CONTINUE");
+        startButtonText.setFont(font);
+        startButtonText.setCharacterSize(12);
+        startButtonText.setFillColor(sf::Color(255, 255, 255));
+        startButtonText.setStyle(sf::Text::Bold);
+        
+        // Instrucciones estilo retro - tamaño base, se escalará dinámicamente
+        instructionText.setString("Navigate the maze - Crystals reflect reality\nFind the green exit - Beware: the goal moves!");
+        instructionText.setFont(font);
+        instructionText.setCharacterSize(10);
+        instructionText.setFillColor(sf::Color(150, 200, 255, 180));
+        
+        // Créditos - tamaño base, se escalará dinámicamente
+        creditText.setString("TSC - 2025");
+        creditText.setFont(font);
+        creditText.setCharacterSize(12);
+        creditText.setFillColor(sf::Color(255, 100, 255));
+        
+        initParticles();
     }
     
-    void update() {
-        // Blink animation
+    void onWindowResize(sf::Vector2u newSize) {
+        // Reinicializar partículas con el nuevo tamaño de ventana
+        initParticles(newSize);
+        
+        // Actualizar fondo para cubrir toda la ventana
+        backgroundGradient.setSize(sf::Vector2f(newSize.x, newSize.y));
+    }
+    
+    void update(sf::Vector2u windowSize) {
+        float deltaTime = animationClock.restart().asSeconds();
+        
+        // Animar partículas de fondo con límites responsive
+        for (size_t i = 0; i < particles.size(); i++) {
+            particles[i].move(particleVelocities[i] * deltaTime * 30.f);
+            
+            sf::Vector2f pos = particles[i].getPosition();
+            // Wrap-around responsive basado en el tamaño actual de la ventana
+            if (pos.x < -10) particles[i].setPosition(windowSize.x + 10, pos.y);
+            if (pos.x > windowSize.x + 10) particles[i].setPosition(-10, pos.y);
+            if (pos.y < -10) particles[i].setPosition(pos.x, windowSize.y + 10);
+            if (pos.y > windowSize.y + 10) particles[i].setPosition(pos.x, -10);
+            
+            // Efecto de parpadeo en las partículas
+            float time = blinkClock.getElapsedTime().asSeconds();
+            sf::Color baseColor = particles[i].getFillColor();
+            float alpha = 80 + 120 * sin(time * 3 + i * 0.8f);
+            particles[i].setFillColor(sf::Color(baseColor.r, baseColor.g, baseColor.b, (sf::Uint8)alpha));
+        }
+        
+        // Efecto pulsante en el título (más sutil para pantallas grandes)
         float time = blinkClock.getElapsedTime().asSeconds();
-        pressStartText.setFillColor(fmod(time, 1.0f) < 0.5f ? sf::Color::White : sf::Color::Transparent);
+        float pulseScale = 1.0f + 0.04f * sin(time * 2.5f);
+        if (windowSize.x >= 1920) {
+            pulseScale = 1.0f + 0.02f * sin(time * 2.5f); // Menos pronunciado en pantallas grandes
+        }
+        titleText.setScale(pulseScale, pulseScale);
+        
+        // Parpadeo del botón
+        float buttonAlpha = 180 + 75 * sin(time * 4);
+        startButtonText.setFillColor(sf::Color(255, 255, 255, (sf::Uint8)buttonAlpha));
+    }
+    
+    void updateButtonHover(float mouseX, float mouseY) {
+        sf::FloatRect buttonBounds = startButton.getGlobalBounds();
+        bool wasHovered = buttonHovered;
+        buttonHovered = buttonBounds.contains(mouseX, mouseY);
+        
+        if (buttonHovered && !wasHovered) {
+            startButton.setFillColor(sf::Color(100, 100, 200, 240));
+            startButton.setScale(1.02f, 1.02f);
+        } else if (!buttonHovered && wasHovered) {
+            startButton.setFillColor(sf::Color(50, 50, 150, 200));
+            startButton.setScale(1.0f, 1.0f);
+        }
+    }
+    
+    bool isStartButtonClicked(float mouseX, float mouseY) {
+        return startButton.getGlobalBounds().contains(mouseX, mouseY);
     }
     
     void draw(sf::RenderWindow& window) {
-        window.clear(sf::Color(15, 15, 30));
+        // Obtener tamaño actual de la ventana
+        sf::Vector2u windowSize = window.getSize();
+        float centerX = windowSize.x / 2.0f;
+        float centerY = windowSize.y / 2.0f;
         
-        // Center texts
-        titleText.setPosition(window.getSize().x/2, window.getSize().y/2 - 50);
-        pressStartText.setPosition(window.getSize().x/2, window.getSize().y/2 + 50);
+        window.clear(sf::Color(5, 5, 15));
         
+        // Ajustar el fondo para que cubra toda la ventana
+        backgroundGradient.setSize(sf::Vector2f(windowSize.x, windowSize.y));
+        window.draw(backgroundGradient);
+        
+        // Dibujar partículas
+        for (auto& particle : particles) {
+            window.draw(particle);
+        }
+        
+        // Sistema de escalado uniforme basado en altura de ventana
+        float baseHeight = 600.0f;
+        float scale = windowSize.y / baseHeight;
+        
+        // Limitar escalas extremas para mantener proporciones
+        scale = max(0.7f, min(scale, 2.5f));
+        
+        // ===== PLAYER INFO =====
+        if (windowSize.x > 800) {
+            float playerOffset = windowSize.x * 0.15f;
+            float playerY = windowSize.y * 0.08f;
+            playerText.setCharacterSize(static_cast<unsigned int>(12.0f * scale));
+            sf::FloatRect playerBounds = playerText.getLocalBounds();
+            playerText.setOrigin(playerBounds.width/2, playerBounds.height/2);
+            playerText.setPosition(centerX + playerOffset, playerY);
+            window.draw(playerText);
+        }
+        
+        // ===== TÍTULO PRINCIPAL =====
+        float titleSize = 32.0f * scale;
+        titleText.setCharacterSize(static_cast<unsigned int>(titleSize));
+        sf::FloatRect titleBounds = titleText.getLocalBounds();
+        titleText.setOrigin(titleBounds.width/2, titleBounds.height/2);
+        
+        // Posición del título - centrado en el tercio superior
+        float titleY = centerY * 0.65f;
+        titleText.setPosition(centerX, titleY);
         window.draw(titleText);
-        window.draw(pressStartText);
+        
+        // ===== SUBTÍTULO =====
+        float subtitleSize = 12.0f * scale;
+        subtitleText.setCharacterSize(static_cast<unsigned int>(subtitleSize));
+        sf::FloatRect subtitleBounds = subtitleText.getLocalBounds();
+        subtitleText.setOrigin(subtitleBounds.width/2, subtitleBounds.height/2);
+        
+        float subtitleY = titleY + (40.0f * scale);
+        subtitleText.setPosition(centerX, subtitleY);
+        window.draw(subtitleText);
+        
+        // ===== BOTÓN DE INICIO =====
+        float buttonWidth = 300.0f * scale;
+        float buttonHeight = 50.0f * scale;
+        
+        // Limitar tamaño máximo del botón para pantallas muy grandes
+        buttonWidth = min(buttonWidth, windowSize.x * 0.25f);
+        buttonHeight = min(buttonHeight, windowSize.y * 0.08f);
+        
+        startButton.setSize(sf::Vector2f(buttonWidth, buttonHeight));
+        
+        float buttonY = subtitleY + (60.0f * scale);
+        startButton.setPosition(centerX - buttonWidth/2, buttonY);
+        
+        // Texto del botón
+        float buttonTextSize = 12.0f * scale;
+        startButtonText.setCharacterSize(static_cast<unsigned int>(buttonTextSize));
+        sf::FloatRect buttonTextBounds = startButtonText.getLocalBounds();
+        startButtonText.setOrigin(buttonTextBounds.width/2, buttonTextBounds.height/2);
+        startButtonText.setPosition(centerX, buttonY + buttonHeight/2);
+        
+        window.draw(startButton);
+        window.draw(startButtonText);
+        
+        // ===== INSTRUCCIONES =====
+        if (windowSize.y > 500) {
+            float instructionSize = 10.0f * scale;
+            instructionText.setCharacterSize(static_cast<unsigned int>(instructionSize));
+            sf::FloatRect instrBounds = instructionText.getLocalBounds();
+            instructionText.setOrigin(instrBounds.width/2, instrBounds.height/2);
+            
+            float instructionY = buttonY + buttonHeight + (50.0f * scale);
+            instructionText.setPosition(centerX, instructionY);
+            window.draw(instructionText);
+        }
+        
+        // ===== CRÉDITOS =====
+        float creditSize = 12.0f * scale;
+        creditText.setCharacterSize(static_cast<unsigned int>(creditSize));
+        sf::FloatRect creditBounds = creditText.getLocalBounds();
+        creditText.setOrigin(creditBounds.width/2, creditBounds.height/2);
+        
+        float creditY = windowSize.y - (40.0f * scale);
+        creditText.setPosition(centerX, creditY);
+        window.draw(creditText);
+        
+        // ===== ELEMENTOS DECORATIVOS - CRISTALES =====
+        if (windowSize.x > 1000) {
+            float crystalOffset = windowSize.x * 0.20f;
+            
+            sf::CircleShape crystal1(6.0f * scale);
+            crystal1.setFillColor(sf::Color(0, 255, 255, 200));
+            crystal1.setPosition(centerX - crystalOffset, titleY - (30.0f * scale));
+            window.draw(crystal1);
+            
+            sf::CircleShape crystal2(8.0f * scale);
+            crystal2.setFillColor(sf::Color(255, 255, 0, 150));
+            crystal2.setPosition(centerX + crystalOffset - (20.0f * scale), titleY - (10.0f * scale));
+            window.draw(crystal2);
+            
+            sf::CircleShape crystal3(5.0f * scale);
+            crystal3.setFillColor(sf::Color(255, 0, 255, 180));
+            crystal3.setPosition(centerX - crystalOffset + (50.0f * scale), buttonY + buttonHeight + (40.0f * scale));
+            window.draw(crystal3);
+            
+            sf::CircleShape crystal4(7.0f * scale);
+            crystal4.setFillColor(sf::Color(0, 255, 0, 160));
+            crystal4.setPosition(centerX + crystalOffset - (60.0f * scale), buttonY + buttonHeight + (20.0f * scale));
+            window.draw(crystal4);
+        }
+        
+        // ===== LÍNEAS DECORATIVAS =====
+        if (windowSize.x > 600) {
+            sf::RectangleShape line1(sf::Vector2f(150.0f * scale, 2.0f * scale));
+            line1.setFillColor(sf::Color(255, 255, 100, 120));
+            line1.setPosition(centerX - (75.0f * scale), subtitleY + (15.0f * scale));
+            window.draw(line1);
+            
+            sf::RectangleShape line2(sf::Vector2f(100.0f * scale, 2.0f * scale));
+            line2.setFillColor(sf::Color(100, 255, 255, 120));
+            line2.setPosition(centerX - (50.0f * scale), buttonY + buttonHeight + (80.0f * scale));
+            window.draw(line2);
+        }
     }
 };
 
@@ -183,7 +433,7 @@ void reflectVertically(int crystalX, int crystalY) {
 }
 
 void reflectDynamically(int crystalX, int crystalY, int directionX, int directionY) {
-    cout << "¡Cristal activado en (" << crystalX << "," << crystalY << ") - Dirección: (" << directionX << "," << directionY << ")\n";
+    cout << "Cristal activado en (" << crystalX << "," << crystalY << ") - Direccion: (" << directionX << "," << directionY << ")\n";
     
     // Determinar tipo de reflexión basado en la dirección de entrada
     if (directionX != 0) {
@@ -255,7 +505,7 @@ void moveGoal(int currentX, int currentY, sf::CircleShape& goal) {
         grid[goalY*W + goalX].type = CellType::Goal;
         
         verifyGoal(goal);
-        cout << "¡La salida se ha movido a (" << goalX << ", " << goalY << ")!\n";
+        cout << "La salida se ha movido a (" << goalX << ", " << goalY << ")!\n";
     }
     
     turnsSinceLastGoalMove = 0;
@@ -612,7 +862,10 @@ int main() {
     updateViews(window);
     
     sf::Font font;
-    if (!font.loadFromFile("../assets/arial.ttf") && !font.loadFromFile("assets/arial.ttf")) {
+    if (!font.loadFromFile("../assets/PRESSSTART2P-REGULAR.TTF") && 
+        !font.loadFromFile("assets/PRESSSTART2P-REGULAR.TTF") &&
+        !font.loadFromFile("../assets/arial.ttf") && 
+        !font.loadFromFile("assets/arial.ttf")) {
         cerr << "Error cargando fuente" << endl;
         return 1;
     }
@@ -622,40 +875,73 @@ int main() {
 
     sf::RectangleShape menuBackground(sf::Vector2f(menuWidth, 2000));
     menuBackground.setPosition(0, 0);
-    menuBackground.setFillColor(sf::Color(25, 25, 35, 240));
-    menuBackground.setOutlineThickness(2.f);
-    menuBackground.setOutlineColor(sf::Color(100, 100, 150, 150));
+    menuBackground.setFillColor(sf::Color(15, 15, 25, 250));
+    
+    // Fondo decorativo con patrón
+    sf::RectangleShape menuPattern(sf::Vector2f(menuWidth, 2000));
+    menuPattern.setPosition(0, 0);
+    menuPattern.setFillColor(sf::Color(30, 30, 45, 100));
+    
+    // Borde elegante del menú
+    sf::RectangleShape menuBorder(sf::Vector2f(menuWidth - 4, 2000));
+    menuBorder.setPosition(2, 0);
+    menuBorder.setFillColor(sf::Color::Transparent);
+    menuBorder.setOutlineThickness(2.f);
+    menuBorder.setOutlineColor(sf::Color(100, 150, 255, 180));
 
-    sf::Text titleText("ESCAPE THE GRID", font, 24);
-    titleText.setFillColor(sf::Color(150, 255, 255));
+    // Título principal con efectos
+    sf::Text titleText("ESCAPE THE GRID", font, 16);
+    titleText.setFillColor(sf::Color(100, 200, 255));
+    titleText.setStyle(sf::Text::Bold);
     sf::FloatRect titleBounds = titleText.getLocalBounds();
-    titleText.setPosition((menuWidth - titleBounds.width) / 2.f, 20);
+    titleText.setPosition((menuWidth - titleBounds.width) / 2.f, 15);
+    
+    // Subtítulo
+    sf::Text subtitleText("Find the maze exit", font, 8);
+    subtitleText.setFillColor(sf::Color(180, 180, 220));
+    sf::FloatRect subtitleBounds = subtitleText.getLocalBounds();
+    subtitleText.setPosition((menuWidth - subtitleBounds.width) / 2.f, 50);
+    
+    // Línea decorativa
+    sf::RectangleShape decorLine(sf::Vector2f(200, 2));
+    decorLine.setPosition((menuWidth - 200) / 2.f, 75);
+    decorLine.setFillColor(sf::Color(100, 150, 255, 150));
 
     vector<unique_ptr<Button>> buttons;
-    buttons.push_back(make_unique<Button>(30, 100, 240, 40, "JUGAR", font, sf::Color(50, 150, 50, 200)));
-    buttons.push_back(make_unique<Button>(30, 150, 240, 40, "AUTOCOMPLETAR", font, sf::Color(150, 100, 50, 200)));
-    buttons.push_back(make_unique<Button>(30, 200, 240, 40, "REINICIAR", font, sf::Color(150, 50, 50, 200)));
+    buttons.push_back(make_unique<Button>(30, 110, 240, 45, "PLAY", font, sf::Color(50, 180, 50, 220)));
+    buttons.push_back(make_unique<Button>(30, 165, 240, 45, "AUTO-SOLVE", font, sf::Color(180, 120, 50, 220)));
+    buttons.push_back(make_unique<Button>(30, 220, 240, 45, "RESTART", font, sf::Color(180, 50, 50, 220)));
 
-    float column1X = 30, column2X = 160, columnsStartY = 260;
-    sf::Text infoTitle = createStyledText("INFORMACION", font, 16, sf::Color(255, 255, 150), column1X, columnsStartY);
+    float column1X = 30, column2X = 160, columnsStartY = 290;
+    
+    // Sección de información mejorada
+    sf::RectangleShape infoSection(sf::Vector2f(240, 180));
+    infoSection.setPosition(30, columnsStartY - 10);
+    infoSection.setFillColor(sf::Color(20, 25, 35, 180));
+    infoSection.setOutlineThickness(1.f);
+    infoSection.setOutlineColor(sf::Color(80, 120, 180, 120));
+    
+    sf::Text infoTitle = createStyledText("INFORMATION", font, 12, sf::Color(150, 200, 255), column1X + 10, columnsStartY);
+    infoTitle.setStyle(sf::Text::Bold);
+    
     vector<sf::Text> infoTexts = {
-        createStyledText("- Jugador (azul)", font, 14, sf::Color(100, 150, 255), column1X, columnsStartY + 30),
-        createStyledText("- Meta (verde)", font, 14, sf::Color(100, 255, 100), column1X, columnsStartY + 60),
-        createStyledText("- Muro (gris)", font, 14, sf::Color(150, 150, 150), column1X, columnsStartY + 90),
-        createStyledText("- Cristal (cyan)", font, 14, sf::Color(0, 255, 255), column1X, columnsStartY + 120)
+        createStyledText("- Player (blue)", font, 8, sf::Color(100, 150, 255), column1X + 15, columnsStartY + 25),
+        createStyledText("- Goal (green)", font, 8, sf::Color(100, 255, 100), column1X + 15, columnsStartY + 45),
+        createStyledText("- Wall (gray)", font, 8, sf::Color(150, 150, 150), column1X + 15, columnsStartY + 65),
+        createStyledText("- Crystal (cyan)", font, 8, sf::Color(0, 255, 255), column1X + 15, columnsStartY + 85)
     };
 
-    sf::Text controlsTitle = createStyledText("CONTROLES", font, 16, sf::Color(255, 255, 150), column2X, columnsStartY);
+    sf::Text controlsTitle = createStyledText("CONTROLS", font, 12, sf::Color(255, 200, 150), column1X + 10, columnsStartY + 110);
+    controlsTitle.setStyle(sf::Text::Bold);
+    
     vector<sf::Text> controlTexts = {
-        createStyledText("- Flechas: Mover", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 30),
-        createStyledText("- ENTER: Resolver", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 60),
-        createStyledText("- R: Reiniciar", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 90),
-        createStyledText("- Click: Mover", font, 14, sf::Color(200, 200, 200), column2X, columnsStartY + 120)
+        createStyledText("- Arrows: Move", font, 8, sf::Color(200, 200, 200), column1X + 15, columnsStartY + 135),
+        createStyledText("- ENTER: Auto-solve", font, 8, sf::Color(200, 200, 200), column1X + 15, columnsStartY + 155)
     };
 
-    sf::Text statusText("", font, 14);
-    sf::Text movesText("Movimientos: 0", font, 14);
-    sf::Text timeText("Tiempo: 0:00", font, 14);
+    sf::Text statusText("", font, 10);
+    sf::Text movesText("Moves: 0", font, 10);
+    sf::Text timeText("Time: 0:00", font, 10);
 
     sf::CircleShape player(cellSize/5), goal(cellSize/5);
     player.setFillColor(sf::Color(50, 150, 255));
@@ -692,12 +978,19 @@ int main() {
             
             if (e.type == sf::Event::Resized) {
                 updateViews(window);
+                // Actualizar la pantalla de título si estamos en ella
+                if (gameState == GameState::TitleScreen) {
+                    titleScreen.onWindowResize(sf::Vector2u(e.size.width, e.size.height));
+                }
             }
             
             // Manejar pantalla de título
             if (gameState == GameState::TitleScreen) {
-                if (e.type == sf::Event::KeyPressed || e.type == sf::Event::MouseButtonPressed) {
-                    gameState = GameState::Menu;
+                if (e.type == sf::Event::MouseButtonPressed) {
+                    sf::Vector2i mousePos(e.mouseButton.x, e.mouseButton.y);
+                    if (titleScreen.isStartButtonClicked(mousePos.x, mousePos.y)) {
+                        gameState = GameState::Menu;
+                    }
                 }
                 continue;
             }
@@ -712,13 +1005,13 @@ int main() {
                     if (buttons[i]->contains(menuCoords.x, menuCoords.y)) {
                         buttonClicked = true;
                         switch (i) {
-                            case 0: // JUGAR
+                            case 0: // PLAY
                                 gameState = GameState::Playing;
                                 autoMode = false;
                                 solved = false;
                                 gameClock.restart();
                                 break;
-                            case 1: // AUTOCOMPLETAR
+                            case 1: // AUTO-SOLVE
                                 if (gameState == GameState::Menu || gameState == GameState::Playing) {
                                     gameState = GameState::Playing;
                                     solved = false;
@@ -732,7 +1025,7 @@ int main() {
                                     gameClock.restart();
                                 }
                                 break;
-                            case 2: // REINICIAR
+                            case 2: // RESTART
                                 resetGame(goal);
                                 currentX = startX;
                                 currentY = startY;
@@ -775,11 +1068,15 @@ int main() {
             }
             
             if (e.type == sf::Event::MouseMoved) {
-                sf::Vector2i mousePos(e.mouseMove.x, e.mouseMove.y);
-                sf::Vector2f menuCoords = windowToMenuCoords(mousePos, window);
-                
-                for (auto& button : buttons) {
-                    button->updateHover(menuCoords.x, menuCoords.y);
+                if (gameState == GameState::TitleScreen) {
+                    titleScreen.updateButtonHover(e.mouseMove.x, e.mouseMove.y);
+                } else {
+                    sf::Vector2i mousePos(e.mouseMove.x, e.mouseMove.y);
+                    sf::Vector2f menuCoords = windowToMenuCoords(mousePos, window);
+                    
+                    for (auto& button : buttons) {
+                        button->updateHover(menuCoords.x, menuCoords.y);
+                    }
                 }
             }
                 
@@ -837,7 +1134,7 @@ int main() {
 
         // Mostrar pantalla de título si corresponde
         if (gameState == GameState::TitleScreen) {
-            titleScreen.update();
+            titleScreen.update(window.getSize());
             titleScreen.draw(window);
             window.display();
             continue;
@@ -941,20 +1238,20 @@ int main() {
         
         sf::Vector2u windowSize = window.getSize();
         
-        movesText.setString("Movimientos: " + to_string(moveCount));
-        timeText.setString("Tiempo: " + to_string(minutes) + ":" + (seconds < 10 ? "0" : "") + to_string(seconds));
+        movesText.setString("Moves: " + to_string(moveCount));
+        timeText.setString("Time: " + to_string(minutes) + ":" + (seconds < 10 ? "0" : "") + to_string(seconds));
         
         switch (gameState) {
             case GameState::Menu:
-                statusText.setString("Bienvenido!");
+                statusText.setString("Welcome!");
                 statusText.setFillColor(sf::Color(150, 255, 150));
                 break;
             case GameState::Playing:
-                statusText.setString(autoMode ? "Resolviendo..." : "Jugando!");
+                statusText.setString(autoMode ? "Auto-solving..." : "Playing!");
                 statusText.setFillColor(autoMode ? sf::Color(255, 255, 150) : sf::Color(150, 150, 255));
                 break;
             case GameState::Solved:
-                statusText.setString("Completado!");
+                statusText.setString("Completed!");
                 statusText.setFillColor(sf::Color(150, 255, 150));
                 break;
             default: break;
@@ -995,12 +1292,17 @@ int main() {
         window.setView(menuView);
         
         window.draw(menuBackground);
+        window.draw(menuPattern);
+        window.draw(menuBorder);
         window.draw(titleText);
+        window.draw(subtitleText);
+        window.draw(decorLine);
         
         for (auto& button : buttons) {
             button->draw(window);
         }
         
+        window.draw(infoSection);
         window.draw(infoTitle);
         for (auto& text : infoTexts) window.draw(text);
         
