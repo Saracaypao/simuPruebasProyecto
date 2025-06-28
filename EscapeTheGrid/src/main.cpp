@@ -12,7 +12,7 @@ using namespace std;
 
 // ==================== ESTRUCTURAS Y ENUMS ====================
 enum class CellType { Empty, Wall, Start, Goal, Crystal };
-enum class GameState { Menu, Playing, Solved };
+enum class GameState { TitleScreen, Menu, Playing, Solved };
 
 struct Cell { 
     CellType type; 
@@ -74,6 +74,54 @@ struct Button {
     }
 };
 
+// ==================== TITLE SCREEN ====================
+class TitleScreen {
+private:
+    sf::Font font;
+    sf::Text titleText;
+    sf::Text pressStartText;
+    sf::Clock blinkClock;
+    
+public:
+    TitleScreen(sf::Font& gameFont) {
+        font = gameFont;
+        
+        // Main title
+        titleText.setString("ESCAPE THE GRID");
+        titleText.setFont(font);
+        titleText.setCharacterSize(48);
+        titleText.setFillColor(sf::Color(150, 255, 255));
+        titleText.setStyle(sf::Text::Bold);
+        sf::FloatRect bounds = titleText.getLocalBounds();
+        titleText.setOrigin(bounds.width/2, bounds.height/2);
+        
+        // Blinking text
+        pressStartText.setString("PRESS ANY KEY TO START");
+        pressStartText.setFont(font);
+        pressStartText.setCharacterSize(24);
+        pressStartText.setFillColor(sf::Color::White);
+        bounds = pressStartText.getLocalBounds();
+        pressStartText.setOrigin(bounds.width/2, bounds.height/2);
+    }
+    
+    void update() {
+        // Blink animation
+        float time = blinkClock.getElapsedTime().asSeconds();
+        pressStartText.setFillColor(fmod(time, 1.0f) < 0.5f ? sf::Color::White : sf::Color::Transparent);
+    }
+    
+    void draw(sf::RenderWindow& window) {
+        window.clear(sf::Color(15, 15, 30));
+        
+        // Center texts
+        titleText.setPosition(window.getSize().x/2, window.getSize().y/2 - 50);
+        pressStartText.setPosition(window.getSize().x/2, window.getSize().y/2 + 50);
+        
+        window.draw(titleText);
+        window.draw(pressStartText);
+    }
+};
+
 // ==================== VARIABLES GLOBALES ====================
 int turnCount = 0;
 const int TURNS_PER_EVENT = 5;
@@ -83,14 +131,13 @@ int W, H;
 vector<Cell> grid;
 int startX, startY, goalX, goalY;
 vector<pair<int,int>> path;
-GameState gameState = GameState::Menu;
+GameState gameState = GameState::TitleScreen;
 
 float cellSize = 35.f;
 float menuWidth = 300.f;
 sf::Vector2f gameOffset(0, 0);
 sf::View gameView, menuView;
 
-// AGREGAR variables globales para tracking de dirección (línea ~75):
 int lastX = -1, lastY = -1; // Para detectar dirección de movimiento
 
 // ==================== FUNCIONES AUXILIARES ====================
@@ -570,6 +617,9 @@ int main() {
         return 1;
     }
 
+    // Crear pantalla de título
+    TitleScreen titleScreen(font);
+
     sf::RectangleShape menuBackground(sf::Vector2f(menuWidth, 2000));
     menuBackground.setPosition(0, 0);
     menuBackground.setFillColor(sf::Color(25, 25, 35, 240));
@@ -642,6 +692,14 @@ int main() {
             
             if (e.type == sf::Event::Resized) {
                 updateViews(window);
+            }
+            
+            // Manejar pantalla de título
+            if (gameState == GameState::TitleScreen) {
+                if (e.type == sf::Event::KeyPressed || e.type == sf::Event::MouseButtonPressed) {
+                    gameState = GameState::Menu;
+                }
+                continue;
             }
                 
             if (e.type == sf::Event::MouseButtonPressed) {
@@ -777,6 +835,14 @@ int main() {
             }
         }
 
+        // Mostrar pantalla de título si corresponde
+        if (gameState == GameState::TitleScreen) {
+            titleScreen.update();
+            titleScreen.draw(window);
+            window.display();
+            continue;
+        }
+
         if (autoMode && step < path.size()) {
             auto [y, x] = path[step];
             sf::Vector2f nextPos(
@@ -891,6 +957,7 @@ int main() {
                 statusText.setString("Completado!");
                 statusText.setFillColor(sf::Color(150, 255, 150));
                 break;
+            default: break;
         }
         
         sf::FloatRect statusBounds = statusText.getLocalBounds();
