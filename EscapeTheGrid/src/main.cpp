@@ -7,6 +7,7 @@
 #include <iostream>
 #include <cmath>
 #include <memory>
+#include <algorithm>
 
 using namespace std;
 
@@ -74,7 +75,7 @@ struct Button {
     }
 };
 
-// ==================== TITLE SCREEN ====================
+// ==================== TITLE SCREEN (CORREGIDO) ====================
 class TitleScreen {
 private:
     sf::Font font;
@@ -96,7 +97,6 @@ private:
         particles.clear();
         particleVelocities.clear();
         
-        // Ajustar número de partículas basado en el área de la pantalla
         int particleCount = min(150, max(50, (int)((windowSize.x * windowSize.y) / 15000)));
         
         for (int i = 0; i < particleCount; i++) {
@@ -121,49 +121,43 @@ public:
     TitleScreen(sf::Font& gameFont) {
         font = gameFont;
         
-        // Fondo estilo arcade - se ajustará dinámicamente
         backgroundGradient.setSize(sf::Vector2f(1200, 800));
         backgroundGradient.setFillColor(sf::Color(5, 5, 15));
         
-        // Título principal estilo arcade - tamaño base, se escalará dinámicamente
         titleText.setString("ESCAPE THE GRID");
         titleText.setFont(font);
-        titleText.setCharacterSize(32);
+        titleText.setCharacterSize(48);
         titleText.setFillColor(sf::Color(180, 220, 255));
         titleText.setStyle(sf::Text::Bold);
         
-        // Subtítulo descriptivo - tamaño base, se escalará dinámicamente
-        subtitleText.setString("CRYSTAL MAZE ADVENTURE");
+        subtitleText.setString("CRYSTAL HAZE ADVENTURE");
         subtitleText.setFont(font);
-        subtitleText.setCharacterSize(12);
+        subtitleText.setCharacterSize(24);
         subtitleText.setFillColor(sf::Color(100, 255, 255));
         
-        // Player info - tamaño base, se escalará dinámicamente
         playerText.setString("1P\n00");
         playerText.setFont(font);
         playerText.setCharacterSize(12);
         playerText.setFillColor(sf::Color(255, 100, 100));
         
-        // Botón estilo arcade - tamaño base, se escalará dinámicamente
-        startButton.setSize(sf::Vector2f(300, 50));
+        startButton.setSize(sf::Vector2f(400, 70));
         startButton.setFillColor(sf::Color(50, 50, 150, 200));
         startButton.setOutlineThickness(3.f);
         startButton.setOutlineColor(sf::Color(255, 255, 100, 180));
         
         startButtonText.setString("CLICK TO CONTINUE");
         startButtonText.setFont(font);
-        startButtonText.setCharacterSize(12);
+        startButtonText.setCharacterSize(24);
         startButtonText.setFillColor(sf::Color(255, 255, 255));
         startButtonText.setStyle(sf::Text::Bold);
         
-        // Instrucciones estilo retro - tamaño base, se escalará dinámicamente
-        instructionText.setString("Navigate the maze - Crystals reflect reality\nFind the green exit - Beware: the goal moves!");
+        instructionText.setString("Navigate the maze - Crystals' reflect reality.\nAnd the green exit 'Beware' the goal moves!");
         instructionText.setFont(font);
-        instructionText.setCharacterSize(10);
+        instructionText.setCharacterSize(16);
         instructionText.setFillColor(sf::Color(150, 200, 255, 180));
+        instructionText.setLineSpacing(1.5f);
         
-        // Créditos - tamaño base, se escalará dinámicamente
-        creditText.setString("TSC - 2025");
+        creditText.setString("TGC - 2025");
         creditText.setFont(font);
         creditText.setCharacterSize(12);
         creditText.setFillColor(sf::Color(255, 100, 255));
@@ -172,43 +166,34 @@ public:
     }
     
     void onWindowResize(sf::Vector2u newSize) {
-        // Reinicializar partículas con el nuevo tamaño de ventana
         initParticles(newSize);
-        
-        // Actualizar fondo para cubrir toda la ventana
-        backgroundGradient.setSize(sf::Vector2f(newSize.x, newSize.y));
     }
     
     void update(sf::Vector2u windowSize) {
         float deltaTime = animationClock.restart().asSeconds();
         
-        // Animar partículas de fondo con límites responsive
         for (size_t i = 0; i < particles.size(); i++) {
             particles[i].move(particleVelocities[i] * deltaTime * 30.f);
             
             sf::Vector2f pos = particles[i].getPosition();
-            // Wrap-around responsive basado en el tamaño actual de la ventana
             if (pos.x < -10) particles[i].setPosition(windowSize.x + 10, pos.y);
             if (pos.x > windowSize.x + 10) particles[i].setPosition(-10, pos.y);
             if (pos.y < -10) particles[i].setPosition(pos.x, windowSize.y + 10);
             if (pos.y > windowSize.y + 10) particles[i].setPosition(pos.x, -10);
             
-            // Efecto de parpadeo en las partículas
             float time = blinkClock.getElapsedTime().asSeconds();
             sf::Color baseColor = particles[i].getFillColor();
             float alpha = 80 + 120 * sin(time * 3 + i * 0.8f);
             particles[i].setFillColor(sf::Color(baseColor.r, baseColor.g, baseColor.b, (sf::Uint8)alpha));
         }
         
-        // Efecto pulsante en el título (más sutil para pantallas grandes)
         float time = blinkClock.getElapsedTime().asSeconds();
         float pulseScale = 1.0f + 0.04f * sin(time * 2.5f);
         if (windowSize.x >= 1920) {
-            pulseScale = 1.0f + 0.02f * sin(time * 2.5f); // Menos pronunciado en pantallas grandes
+            pulseScale = 1.0f + 0.02f * sin(time * 2.5f);
         }
         titleText.setScale(pulseScale, pulseScale);
         
-        // Parpadeo del botón
         float buttonAlpha = 180 + 75 * sin(time * 4);
         startButtonText.setFillColor(sf::Color(255, 255, 255, (sf::Uint8)buttonAlpha));
     }
@@ -232,144 +217,65 @@ public:
     }
     
     void draw(sf::RenderWindow& window) {
-        // Obtener tamaño actual de la ventana
-        sf::Vector2u windowSize = window.getSize();
-        float centerX = windowSize.x / 2.0f;
-        float centerY = windowSize.y / 2.0f;
-        
-        window.clear(sf::Color(5, 5, 15));
-        
-        // Ajustar el fondo para que cubra toda la ventana
-        backgroundGradient.setSize(sf::Vector2f(windowSize.x, windowSize.y));
-        window.draw(backgroundGradient);
-        
-        // Dibujar partículas
-        for (auto& particle : particles) {
-            window.draw(particle);
-        }
-        
-        // Sistema de escalado uniforme basado en altura de ventana
-        float baseHeight = 600.0f;
-        float scale = windowSize.y / baseHeight;
-        
-        // Limitar escalas extremas para mantener proporciones
-        scale = max(0.7f, min(scale, 2.5f));
-        
-        // ===== PLAYER INFO =====
-        if (windowSize.x > 800) {
-            float playerOffset = windowSize.x * 0.15f;
-            float playerY = windowSize.y * 0.08f;
-            playerText.setCharacterSize(static_cast<unsigned int>(12.0f * scale));
-            sf::FloatRect playerBounds = playerText.getLocalBounds();
-            playerText.setOrigin(playerBounds.width/2, playerBounds.height/2);
-            playerText.setPosition(centerX + playerOffset, playerY);
-            window.draw(playerText);
-        }
-        
-        // ===== TÍTULO PRINCIPAL =====
-        float titleSize = 32.0f * scale;
-        titleText.setCharacterSize(static_cast<unsigned int>(titleSize));
-        sf::FloatRect titleBounds = titleText.getLocalBounds();
-        titleText.setOrigin(titleBounds.width/2, titleBounds.height/2);
-        
-        // Posición del título - centrado en el tercio superior
-        float titleY = centerY * 0.65f;
-        titleText.setPosition(centerX, titleY);
-        window.draw(titleText);
-        
-        // ===== SUBTÍTULO =====
-        float subtitleSize = 12.0f * scale;
-        subtitleText.setCharacterSize(static_cast<unsigned int>(subtitleSize));
-        sf::FloatRect subtitleBounds = subtitleText.getLocalBounds();
-        subtitleText.setOrigin(subtitleBounds.width/2, subtitleBounds.height/2);
-        
-        float subtitleY = titleY + (40.0f * scale);
-        subtitleText.setPosition(centerX, subtitleY);
-        window.draw(subtitleText);
-        
-        // ===== BOTÓN DE INICIO =====
-        float buttonWidth = 300.0f * scale;
-        float buttonHeight = 50.0f * scale;
-        
-        // Limitar tamaño máximo del botón para pantallas muy grandes
-        buttonWidth = min(buttonWidth, windowSize.x * 0.25f);
-        buttonHeight = min(buttonHeight, windowSize.y * 0.08f);
-        
-        startButton.setSize(sf::Vector2f(buttonWidth, buttonHeight));
-        
-        float buttonY = subtitleY + (60.0f * scale);
-        startButton.setPosition(centerX - buttonWidth/2, buttonY);
-        
-        // Texto del botón
-        float buttonTextSize = 12.0f * scale;
-        startButtonText.setCharacterSize(static_cast<unsigned int>(buttonTextSize));
-        sf::FloatRect buttonTextBounds = startButtonText.getLocalBounds();
-        startButtonText.setOrigin(buttonTextBounds.width/2, buttonTextBounds.height/2);
-        startButtonText.setPosition(centerX, buttonY + buttonHeight/2);
-        
-        window.draw(startButton);
-        window.draw(startButtonText);
-        
-        // ===== INSTRUCCIONES =====
-        if (windowSize.y > 500) {
-            float instructionSize = 10.0f * scale;
-            instructionText.setCharacterSize(static_cast<unsigned int>(instructionSize));
-            sf::FloatRect instrBounds = instructionText.getLocalBounds();
-            instructionText.setOrigin(instrBounds.width/2, instrBounds.height/2);
-            
-            float instructionY = buttonY + buttonHeight + (50.0f * scale);
-            instructionText.setPosition(centerX, instructionY);
-            window.draw(instructionText);
-        }
-        
-        // ===== CRÉDITOS =====
-        float creditSize = 12.0f * scale;
-        creditText.setCharacterSize(static_cast<unsigned int>(creditSize));
-        sf::FloatRect creditBounds = creditText.getLocalBounds();
-        creditText.setOrigin(creditBounds.width/2, creditBounds.height/2);
-        
-        float creditY = windowSize.y - (40.0f * scale);
-        creditText.setPosition(centerX, creditY);
-        window.draw(creditText);
-        
-        // ===== ELEMENTOS DECORATIVOS - CRISTALES =====
-        if (windowSize.x > 1000) {
-            float crystalOffset = windowSize.x * 0.20f;
-            
-            sf::CircleShape crystal1(6.0f * scale);
-            crystal1.setFillColor(sf::Color(0, 255, 255, 200));
-            crystal1.setPosition(centerX - crystalOffset, titleY - (30.0f * scale));
-            window.draw(crystal1);
-            
-            sf::CircleShape crystal2(8.0f * scale);
-            crystal2.setFillColor(sf::Color(255, 255, 0, 150));
-            crystal2.setPosition(centerX + crystalOffset - (20.0f * scale), titleY - (10.0f * scale));
-            window.draw(crystal2);
-            
-            sf::CircleShape crystal3(5.0f * scale);
-            crystal3.setFillColor(sf::Color(255, 0, 255, 180));
-            crystal3.setPosition(centerX - crystalOffset + (50.0f * scale), buttonY + buttonHeight + (40.0f * scale));
-            window.draw(crystal3);
-            
-            sf::CircleShape crystal4(7.0f * scale);
-            crystal4.setFillColor(sf::Color(0, 255, 0, 160));
-            crystal4.setPosition(centerX + crystalOffset - (60.0f * scale), buttonY + buttonHeight + (20.0f * scale));
-            window.draw(crystal4);
-        }
-        
-        // ===== LÍNEAS DECORATIVAS =====
-        if (windowSize.x > 600) {
-            sf::RectangleShape line1(sf::Vector2f(150.0f * scale, 2.0f * scale));
-            line1.setFillColor(sf::Color(255, 255, 100, 120));
-            line1.setPosition(centerX - (75.0f * scale), subtitleY + (15.0f * scale));
-            window.draw(line1);
-            
-            sf::RectangleShape line2(sf::Vector2f(100.0f * scale, 2.0f * scale));
-            line2.setFillColor(sf::Color(100, 255, 255, 120));
-            line2.setPosition(centerX - (50.0f * scale), buttonY + buttonHeight + (80.0f * scale));
-            window.draw(line2);
-        }
+    sf::Vector2u windowSize = window.getSize();
+    float scale = min(
+        windowSize.x / 1200.0f,
+        windowSize.y / 800.0f
+    );
+    scale = max(0.5f, min(scale, 2.0f));
+
+    sf::Vector2f center(windowSize.x / 2.0f, windowSize.y / 2.0f);
+
+    // Fondo que cubre toda la pantalla
+    backgroundGradient.setSize(sf::Vector2f(windowSize.x, windowSize.y));
+    window.draw(backgroundGradient);
+
+    // Partículas de fondo
+    for (auto& particle : particles) {
+        window.draw(particle);
     }
+
+    // Título - Centrado verticalmente
+    titleText.setCharacterSize(static_cast<unsigned int>(48 * scale));
+    sf::FloatRect titleBounds = titleText.getLocalBounds();
+    titleText.setOrigin(titleBounds.width/2, titleBounds.height/2);
+    titleText.setPosition(center.x, center.y - 100);  // Ajustado para centrar verticalmente
+    window.draw(titleText);
+
+    // Subtítulo
+    subtitleText.setCharacterSize(static_cast<unsigned int>(24 * scale));
+    sf::FloatRect subtitleBounds = subtitleText.getLocalBounds();
+    subtitleText.setOrigin(subtitleBounds.width/2, subtitleBounds.height/2);
+    subtitleText.setPosition(center.x, center.y - 40);  // Ajustado para centrar verticalmente
+    window.draw(subtitleText);
+
+    // Botón
+    startButton.setSize(sf::Vector2f(400 * scale, 70 * scale));
+    startButton.setOrigin(startButton.getSize().x/2, startButton.getSize().y/2);
+    startButton.setPosition(center.x, center.y + 50);  // Ajustado para centrar verticalmente
+    window.draw(startButton);
+
+    // Texto del botón
+    startButtonText.setCharacterSize(static_cast<unsigned int>(24 * scale));
+    sf::FloatRect buttonTextBounds = startButtonText.getLocalBounds();
+    startButtonText.setOrigin(buttonTextBounds.width/2, buttonTextBounds.height/2);
+    startButtonText.setPosition(center.x, center.y + 50);  // Ajustado para centrar verticalmente
+    window.draw(startButtonText);
+
+    // Instrucciones
+    instructionText.setCharacterSize(static_cast<unsigned int>(16 * scale));
+    sf::FloatRect instrBounds = instructionText.getLocalBounds();
+    instructionText.setOrigin(instrBounds.width/2, instrBounds.height/2);
+    instructionText.setPosition(center.x, center.y + 150);  // Ajustado para centrar verticalmente
+    window.draw(instructionText);
+
+    // Créditos
+    creditText.setCharacterSize(static_cast<unsigned int>(12 * scale));
+    sf::FloatRect creditBounds = creditText.getLocalBounds();
+    creditText.setOrigin(creditBounds.width/2, creditBounds.height/2);
+    creditText.setPosition(center.x, windowSize.y - 40 * scale);
+    window.draw(creditText);
+}
 };
 
 // ==================== VARIABLES GLOBALES ====================
@@ -388,16 +294,14 @@ float menuWidth = 300.f;
 sf::Vector2f gameOffset(0, 0);
 sf::View gameView, menuView;
 
-int lastX = -1, lastY = -1; // Para detectar dirección de movimiento
+int lastX = -1, lastY = -1;
 
 // ==================== FUNCIONES AUXILIARES ====================
 bool inside(int y, int x) {
     return x >= 0 && x < W && y >= 0 && y < H;
 }
 
-// ==================== FUNCIONES DE REFLEXIÓN MEJORADAS ====================
 void reflectHorizontally(int crystalX, int crystalY) {
-    // Reflejar todo el lado izquierdo hacia la derecha tal cual
     for (int x = 0; x < crystalX; x++) {
         int reflectedX = crystalX + (crystalX - x);
         if (reflectedX < W) {
@@ -405,7 +309,6 @@ void reflectHorizontally(int crystalX, int crystalY) {
         }
     }
     
-    // Reflejar todo el lado derecho hacia la izquierda tal cual
     for (int x = crystalX + 1; x < W; x++) {
         int reflectedX = crystalX - (x - crystalX);
         if (reflectedX >= 0) {
@@ -415,7 +318,6 @@ void reflectHorizontally(int crystalX, int crystalY) {
 }
 
 void reflectVertically(int crystalX, int crystalY) {
-    // Reflejar todo el lado superior hacia abajo tal cual
     for (int y = 0; y < crystalY; y++) {
         int reflectedY = crystalY + (crystalY - y);
         if (reflectedY < H) {
@@ -423,7 +325,6 @@ void reflectVertically(int crystalX, int crystalY) {
         }
     }
     
-    // Reflejar todo el lado inferior hacia arriba tal cual
     for (int y = crystalY + 1; y < H; y++) {
         int reflectedY = crystalY - (y - crystalY);
         if (reflectedY >= 0) {
@@ -435,20 +336,16 @@ void reflectVertically(int crystalX, int crystalY) {
 void reflectDynamically(int crystalX, int crystalY, int directionX, int directionY) {
     cout << "Cristal activado en (" << crystalX << "," << crystalY << ") - Direccion: (" << directionX << "," << directionY << ")\n";
     
-    // Determinar tipo de reflexión basado en la dirección de entrada
     if (directionX != 0) {
-        // Movimiento horizontal -> Reflejar horizontalmente
         reflectHorizontally(crystalX, crystalY);
         cout << "Reflejo HORIZONTAL activado (movimiento izquierda/derecha)\n";
     } else if (directionY != 0) {
-        // Movimiento vertical -> Reflejar verticalmente  
         reflectVertically(crystalX, crystalY);
         cout << "Reflejo VERTICAL activado (movimiento arriba/abajo)\n";
     }
 }
 
 void reflectCrystals(int currentX, int currentY) {
-    // Calcular dirección de movimiento
     int directionX = 0, directionY = 0;
     
     if (lastX != -1 && lastY != -1) {
@@ -456,17 +353,14 @@ void reflectCrystals(int currentX, int currentY) {
         directionY = currentY - lastY;
     }
     
-    // Verificar si el jugador está en un cristal
     if (grid[currentY*W + currentX].type == CellType::Crystal) {
         reflectDynamically(currentX, currentY, directionX, directionY);
     }
     
-    // Actualizar posición anterior
     lastX = currentX;
     lastY = currentY;
 }
 
-// ==================== RESTANTE DEL CÓDIGO ====================
 void verifyGoal(sf::CircleShape& goal) {
     if (grid[goalY*W + goalX].type != CellType::Goal) {
         grid[goalY*W + goalX].type = CellType::Goal;
@@ -523,14 +417,12 @@ bool loadMaze(const string& path) {
         return false;
     }
     
-    // Knapsack optimization: calcular capacidad óptima de memoria
     int totalCells = W * H;
-    int memoryCapacity = min(totalCells, 2500); // Límite de memoria eficiente
+    int memoryCapacity = min(totalCells, 2500);
     
-    // Solo redimensionar si es necesario (evita reallocaciones innecesarias)
     if (grid.size() != totalCells) {
         grid.clear();
-        grid.reserve(memoryCapacity); // Reservar memoria óptima
+        grid.reserve(memoryCapacity);
         grid.resize(totalCells);
     }
     
@@ -610,7 +502,6 @@ void resetGame(sf::CircleShape& goal) {
     
     grid[startY*W + startX].hasBeenTraversed = true;
     
-    // Resetear tracking de posición
     lastX = startX;
     lastY = startY;
     
@@ -631,15 +522,11 @@ void triggerMapEvent() {
     }
 }
 
-// AGREGAR al inicio de bfsSolve() para cache inteligente:
 void bfsSolve() {
-    // LCS optimization: reutilizar segmentos de caminos anteriores si son similares
     static vector<pair<int,int>> lastPath;
     static int lastStartX = -1, lastStartY = -1, lastGoalX = -1, lastGoalY = -1;
     
-    // Verificar si podemos reutilizar el camino anterior (LCS logic)
     if (lastStartX == startX && lastStartY == startY && lastGoalX == goalX && lastGoalY == goalY && !lastPath.empty()) {
-        // Validar que el camino anterior sigue siendo válido
         bool pathValid = true;
         for (auto [y, x] : lastPath) {
             if (grid[y*W + x].type == CellType::Wall) {
@@ -649,7 +536,7 @@ void bfsSolve() {
         }
         
         if (pathValid) {
-            path = lastPath; // Reutilizar camino cached
+            path = lastPath;
             return;
         }
     }
@@ -668,12 +555,11 @@ void bfsSolve() {
     
     path.clear();
     
-    // Minimum Coin Change aplicado: usar dp para encontrar costo mínimo
     vector<vector<int>> cost(H, vector<int>(W, INT_MAX));
     vector<vector<pair<int,int>>> parent(H, vector<pair<int,int>>(W, {-1,-1}));
     queue<pair<int,int>> q;
     
-    cost[startY][startX] = 0; // Costo inicial = 0
+    cost[startY][startX] = 0;
     q.push({startY, startX});
     
     int dirs[4][2] = {{1,0}, {-1,0}, {0,1}, {0,-1}};
@@ -694,14 +580,12 @@ void bfsSolve() {
             if (!inside(ny,nx)) continue;
             if (grid[ny*W+nx].type == CellType::Wall) continue;
             
-            // Aplicar costos dinámicos basados en tipo de celda (Coin Change logic)
-            int moveCost = 1; // Costo base
-            if (grid[ny*W+nx].type == CellType::Crystal) moveCost = 3; // Cristales cuestan más
-            if (grid[ny*W+nx].hasBeenTraversed) moveCost = 1; // Celdas ya visitadas son más baratas
+            int moveCost = 1;
+            if (grid[ny*W+nx].type == CellType::Crystal) moveCost = 3;
+            if (grid[ny*W+nx].hasBeenTraversed) moveCost = 1;
             
             int newCost = cost[y][x] + moveCost;
             
-            // Solo procesar si encontramos un camino más barato (DP optimization)
             if (newCost < cost[ny][nx]) {
                 cost[ny][nx] = newCost;
                 parent[ny][nx] = {y,x};
@@ -710,7 +594,6 @@ void bfsSolve() {
         }
     }
 
-    // Reconstruir camino óptimo
     if (found) {
         for (int cy = goalY, cx = goalX; cy != -1; ) {
             path.push_back({cy,cx});
@@ -720,7 +603,6 @@ void bfsSolve() {
         }
         reverse(path.begin(), path.end());
         
-        // Guardar en cache para futura reutilización (LCS optimization)
         lastPath = path;
         lastStartX = startX; lastStartY = startY;
         lastGoalX = tempGoalX; lastGoalY = tempGoalY;
@@ -755,11 +637,9 @@ bool tryMovePlayer(int newX, int newY, int& currentX, int& currentY, sf::CircleS
 
         grid[currentY*W + currentX].hasBeenTraversed = true;
         
-        // Solo reflejar cuando el jugador pasa por un cristal (con dirección)
         if (grid[currentY*W + currentX].type == CellType::Crystal) {
             reflectCrystals(currentX, currentY);
         } else {
-            // Actualizar posición anterior sin activar reflejo
             lastX = currentX;
             lastY = currentY;
         }
@@ -856,7 +736,7 @@ int main() {
     float initialGameHeight = H * cellSize;
     float initialTotalWidth = initialGameWidth + menuWidth;
     
-    sf::RenderWindow window(sf::VideoMode(initialTotalWidth, initialGameHeight), "Escape the Grid");
+    sf::RenderWindow window(sf::VideoMode(initialTotalWidth, initialGameHeight), "Escape the Grid", sf::Style::Default);
     window.setFramerateLimit(60);
     
     updateViews(window);
@@ -870,39 +750,33 @@ int main() {
         return 1;
     }
 
-    // Crear pantalla de título
     TitleScreen titleScreen(font);
 
     sf::RectangleShape menuBackground(sf::Vector2f(menuWidth, 2000));
     menuBackground.setPosition(0, 0);
     menuBackground.setFillColor(sf::Color(15, 15, 25, 250));
     
-    // Fondo decorativo con patrón
     sf::RectangleShape menuPattern(sf::Vector2f(menuWidth, 2000));
     menuPattern.setPosition(0, 0);
     menuPattern.setFillColor(sf::Color(30, 30, 45, 100));
     
-    // Borde elegante del menú
     sf::RectangleShape menuBorder(sf::Vector2f(menuWidth - 4, 2000));
     menuBorder.setPosition(2, 0);
     menuBorder.setFillColor(sf::Color::Transparent);
     menuBorder.setOutlineThickness(2.f);
     menuBorder.setOutlineColor(sf::Color(100, 150, 255, 180));
 
-    // Título principal con efectos
     sf::Text titleText("ESCAPE THE GRID", font, 16);
     titleText.setFillColor(sf::Color(100, 200, 255));
     titleText.setStyle(sf::Text::Bold);
     sf::FloatRect titleBounds = titleText.getLocalBounds();
     titleText.setPosition((menuWidth - titleBounds.width) / 2.f, 15);
     
-    // Subtítulo
     sf::Text subtitleText("Find the maze exit", font, 8);
     subtitleText.setFillColor(sf::Color(180, 180, 220));
     sf::FloatRect subtitleBounds = subtitleText.getLocalBounds();
     subtitleText.setPosition((menuWidth - subtitleBounds.width) / 2.f, 50);
     
-    // Línea decorativa
     sf::RectangleShape decorLine(sf::Vector2f(200, 2));
     decorLine.setPosition((menuWidth - 200) / 2.f, 75);
     decorLine.setFillColor(sf::Color(100, 150, 255, 150));
@@ -914,7 +788,6 @@ int main() {
 
     float column1X = 30, column2X = 160, columnsStartY = 290;
     
-    // Sección de información mejorada
     sf::RectangleShape infoSection(sf::Vector2f(240, 180));
     infoSection.setPosition(30, columnsStartY - 10);
     infoSection.setFillColor(sf::Color(20, 25, 35, 180));
@@ -962,7 +835,6 @@ int main() {
     int currentX = startX, currentY = startY;
     int moveCount = 0;
     
-    // Inicializar tracking de posición
     lastX = startX;
     lastY = startY;
 
@@ -977,20 +849,25 @@ int main() {
                 window.close();
             
             if (e.type == sf::Event::Resized) {
-                updateViews(window);
-                // Actualizar la pantalla de título si estamos en ella
                 if (gameState == GameState::TitleScreen) {
+                    sf::FloatRect visibleArea(0, 0, e.size.width, e.size.height);
+                    window.setView(sf::View(visibleArea));
                     titleScreen.onWindowResize(sf::Vector2u(e.size.width, e.size.height));
+                }
+                else {
+                    updateViews(window);
                 }
             }
             
-            // Manejar pantalla de título
             if (gameState == GameState::TitleScreen) {
                 if (e.type == sf::Event::MouseButtonPressed) {
                     sf::Vector2i mousePos(e.mouseButton.x, e.mouseButton.y);
                     if (titleScreen.isStartButtonClicked(mousePos.x, mousePos.y)) {
                         gameState = GameState::Menu;
                     }
+                }
+                else if (e.type == sf::Event::MouseMoved) {
+                    titleScreen.updateButtonHover(e.mouseMove.x, e.mouseMove.y);
                 }
                 continue;
             }
@@ -1067,16 +944,12 @@ int main() {
                 }
             }
             
-            if (e.type == sf::Event::MouseMoved) {
-                if (gameState == GameState::TitleScreen) {
-                    titleScreen.updateButtonHover(e.mouseMove.x, e.mouseMove.y);
-                } else {
-                    sf::Vector2i mousePos(e.mouseMove.x, e.mouseMove.y);
-                    sf::Vector2f menuCoords = windowToMenuCoords(mousePos, window);
-                    
-                    for (auto& button : buttons) {
-                        button->updateHover(menuCoords.x, menuCoords.y);
-                    }
+            if (e.type == sf::Event::MouseMoved && gameState != GameState::TitleScreen) {
+                sf::Vector2i mousePos(e.mouseMove.x, e.mouseMove.y);
+                sf::Vector2f menuCoords = windowToMenuCoords(mousePos, window);
+                
+                for (auto& button : buttons) {
+                    button->updateHover(menuCoords.x, menuCoords.y);
                 }
             }
                 
@@ -1132,9 +1005,9 @@ int main() {
             }
         }
 
-        // Mostrar pantalla de título si corresponde
         if (gameState == GameState::TitleScreen) {
             titleScreen.update(window.getSize());
+            window.clear();
             titleScreen.draw(window);
             window.display();
             continue;
@@ -1150,11 +1023,9 @@ int main() {
             sf::Vector2f direction = nextPos - currentPos;
             float distance = sqrt(direction.x*direction.x + direction.y*direction.y);
             
-            // Rod Cutting optimization: dividir la animación en segmentos óptimos
-            vector<int> framePrices = {1, 3, 4, 5}; // Valores de eficiencia por frame
+            vector<int> framePrices = {1, 3, 4, 5};
             int totalFrames = max(1, (int)(distance / 2.0f));
             
-            // Calcular división óptima de frames usando Rod Cutting
             vector<int> dp(totalFrames + 1, 0);
             for (int i = 1; i <= totalFrames; i++) {
                 for (int j = 1; j <= min(i, (int)framePrices.size()); j++) {
@@ -1162,9 +1033,8 @@ int main() {
                 }
             }
             
-            // Usar velocidad adaptativa basada en la división óptima
             float optimalSpeed = 2.0f + (dp[totalFrames] * 0.1f);
-            float animationSpeed = min(optimalSpeed, 6.0f); // Límite máximo
+            float animationSpeed = min(optimalSpeed, 6.0f);
 
             if (distance > 1.f) {
                 direction /= distance;
@@ -1178,11 +1048,9 @@ int main() {
 
                 grid[y*W + x].hasBeenTraversed = true;
                 
-                // Solo reflejar cuando el jugador pasa por un cristal (con dirección)
                 if (grid[y*W + x].type == CellType::Crystal) {
                     reflectCrystals(currentX, currentY);
                 } else {
-                    // Actualizar posición anterior sin activar reflejo
                     lastX = currentX;
                     lastY = currentY;
                 }
