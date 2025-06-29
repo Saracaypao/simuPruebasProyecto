@@ -268,6 +268,327 @@ public:
 }
 };
 
+// Pantalla de victoria con efectos visuales y botón de reinicio
+class VictoryScreen {
+private:
+    sf::Font font;
+    sf::Text victoryText;
+    sf::Text timeText;
+    sf::Text movesText;
+    sf::Clock animationClock;
+    sf::Clock blinkClock;
+    vector<sf::CircleShape> particles;
+    vector<sf::Vector2f> particleVelocities;
+    sf::RectangleShape backgroundGradient;
+    sf::RectangleShape playAgainButton;
+    sf::Text playAgainButtonText;
+    bool buttonHovered = false;
+    
+    // Datos de la partida completada
+    int finalMoves;
+    float finalTime;
+    
+    void initParticles(sf::Vector2u windowSize = sf::Vector2u(1200, 800)) {
+        particles.clear();
+        particleVelocities.clear();
+        
+        // Ajustar la cantidad de partículas según el tamaño de pantalla
+        int particleCount = min(200, max(50, (int)((windowSize.x * windowSize.y) / 12000)));
+        
+        // Reducir partículas en pantallas pequeñas para mejor rendimiento
+        if (windowSize.x < 800) particleCount = min(120, particleCount);
+        if (windowSize.x < 600) particleCount = min(80, particleCount);
+        
+        for (int i = 0; i < particleCount; i++) {
+            // Ajustar el tamaño de las partículas según la pantalla
+            float particleSize = 1.f + rand() % 4;
+            if (windowSize.x < 800) particleSize = 1.f + rand() % 3;
+            if (windowSize.x < 600) particleSize = 1.f + rand() % 2;
+            
+            sf::CircleShape particle(particleSize);
+            particle.setFillColor(sf::Color(
+                255,
+                200 + rand() % 56,
+                50 + rand() % 106,
+                100 + rand() % 156
+            ));
+            particle.setPosition(rand() % windowSize.x, rand() % windowSize.y);
+            particles.push_back(particle);
+            
+            // Ajustar la velocidad de las partículas según el tamaño de pantalla
+            float velocityScale = 1.0f;
+            if (windowSize.x < 800) velocityScale = 0.8f;
+            if (windowSize.x < 600) velocityScale = 0.6f;
+            
+            particleVelocities.push_back(sf::Vector2f(
+                ((rand() % 30 - 15) / 10.f) * velocityScale,
+                ((rand() % 30 - 15) / 10.f) * velocityScale
+            ));
+        }
+    }
+    
+    // Función para dibujar el trofeo dorado pixelado con diseño responsive
+    void drawTrophy(sf::RenderWindow& window, sf::Vector2f center, float scale) {
+        sf::Vector2u windowSize = window.getSize();
+        
+        // Ajustar el tamaño del pixel según el tamaño de ventana
+        float pixelSize = 8.f * scale;
+        if (windowSize.x < 800) pixelSize = 6.f * scale;
+        if (windowSize.x < 600) pixelSize = 5.f * scale;
+        
+        // Ajustar el tamaño general del trofeo en pantallas pequeñas
+        float trophyScale = 1.0f;
+        if (windowSize.y < 600) trophyScale = 0.8f;
+        if (windowSize.x < 600) trophyScale = 0.7f;
+        
+        pixelSize *= trophyScale;
+        
+        // Base del trofeo
+        sf::RectangleShape base(sf::Vector2f(pixelSize * 8, pixelSize * 2));
+        base.setFillColor(sf::Color(255, 215, 0)); // Dorado
+        base.setPosition(center.x - pixelSize * 4, center.y + pixelSize * 4);
+        window.draw(base);
+        
+        // Soporte del trofeo
+        sf::RectangleShape support(sf::Vector2f(pixelSize * 2, pixelSize * 3));
+        support.setFillColor(sf::Color(255, 215, 0));
+        support.setPosition(center.x - pixelSize, center.y + pixelSize);
+        window.draw(support);
+        
+        // Copa principal
+        sf::RectangleShape cup(sf::Vector2f(pixelSize * 6, pixelSize * 4));
+        cup.setFillColor(sf::Color(255, 215, 0));
+        cup.setPosition(center.x - pixelSize * 3, center.y - pixelSize * 3);
+        window.draw(cup);
+        
+        // Manijas del trofeo
+        sf::RectangleShape leftHandle(sf::Vector2f(pixelSize, pixelSize * 2));
+        leftHandle.setFillColor(sf::Color(255, 215, 0));
+        leftHandle.setPosition(center.x - pixelSize * 4, center.y - pixelSize * 2);
+        window.draw(leftHandle);
+        
+        sf::RectangleShape rightHandle(sf::Vector2f(pixelSize, pixelSize * 2));
+        rightHandle.setFillColor(sf::Color(255, 215, 0));
+        rightHandle.setPosition(center.x + pixelSize * 3, center.y - pixelSize * 2);
+        window.draw(rightHandle);
+        
+        // Detalles brillantes adaptativos
+        if (pixelSize > 4.0f) { // Solo mostrar detalles si hay suficiente espacio
+            sf::RectangleShape shine1(sf::Vector2f(pixelSize, pixelSize));
+            shine1.setFillColor(sf::Color(255, 255, 255, 200));
+            shine1.setPosition(center.x - pixelSize * 2, center.y - pixelSize * 2);
+            window.draw(shine1);
+            
+            sf::RectangleShape shine2(sf::Vector2f(pixelSize, pixelSize));
+            shine2.setFillColor(sf::Color(255, 255, 255, 150));
+            shine2.setPosition(center.x, center.y - pixelSize);
+            window.draw(shine2);
+        }
+    }
+    
+public:
+    VictoryScreen(sf::Font& gameFont) {
+        font = gameFont;
+        finalMoves = 0;
+        finalTime = 0.0f;
+        
+        backgroundGradient.setSize(sf::Vector2f(1200, 800));
+        backgroundGradient.setFillColor(sf::Color(10, 5, 20));
+        
+        victoryText.setString("YOU WIN!");
+        victoryText.setFont(font);
+        victoryText.setCharacterSize(64);
+        victoryText.setFillColor(sf::Color(255, 215, 0)); // Dorado
+        victoryText.setStyle(sf::Text::Bold);
+        
+        timeText.setString("");
+        timeText.setFont(font);
+        timeText.setCharacterSize(16);
+        timeText.setFillColor(sf::Color(255, 255, 255));
+        
+        movesText.setString("");
+        movesText.setFont(font);
+        movesText.setCharacterSize(16);
+        movesText.setFillColor(sf::Color(255, 255, 255));
+        
+        playAgainButton.setSize(sf::Vector2f(300, 60));
+        playAgainButton.setFillColor(sf::Color(50, 150, 50, 200));
+        playAgainButton.setOutlineThickness(3.f);
+        playAgainButton.setOutlineColor(sf::Color(255, 255, 100, 180));
+        
+        playAgainButtonText.setString("PLAY AGAIN");
+        playAgainButtonText.setFont(font);
+        playAgainButtonText.setCharacterSize(20);
+        playAgainButtonText.setFillColor(sf::Color(255, 255, 255));
+        playAgainButtonText.setStyle(sf::Text::Bold);
+        
+        initParticles();
+    }
+    
+    void setGameStats(int moves, float time) {
+        finalMoves = moves;
+        finalTime = time;
+        
+        int minutes = (int)finalTime / 60;
+        int seconds = (int)finalTime % 60;
+        timeText.setString("Time: " + to_string(minutes) + ":" + (seconds < 10 ? "0" : "") + to_string(seconds));
+        movesText.setString("Moves: " + to_string(finalMoves));
+    }
+    
+    void onWindowResize(sf::Vector2u newSize) {
+        initParticles(newSize);
+    }
+    
+    void update(sf::Vector2u windowSize) {
+        float deltaTime = animationClock.restart().asSeconds();
+        
+        // Ajustar la velocidad de animación según el tamaño de pantalla
+        float animationSpeed = 40.f;
+        if (windowSize.x < 800) animationSpeed = 30.f;
+        if (windowSize.x < 600) animationSpeed = 25.f;
+        
+        // Actualizar partículas doradas
+        for (size_t i = 0; i < particles.size(); i++) {
+            particles[i].move(particleVelocities[i] * deltaTime * animationSpeed);
+            
+            sf::Vector2f pos = particles[i].getPosition();
+            if (pos.x < -10) particles[i].setPosition(windowSize.x + 10, pos.y);
+            if (pos.x > windowSize.x + 10) particles[i].setPosition(-10, pos.y);
+            if (pos.y < -10) particles[i].setPosition(pos.x, windowSize.y + 10);
+            if (pos.y > windowSize.y + 10) particles[i].setPosition(pos.x, -10);
+            
+            float time = blinkClock.getElapsedTime().asSeconds();
+            sf::Color baseColor = particles[i].getFillColor();
+            float alpha = 100 + 155 * sin(time * 2 + i * 0.5f);
+            particles[i].setFillColor(sf::Color(baseColor.r, baseColor.g, baseColor.b, (sf::Uint8)alpha));
+        }
+        
+        // Animación pulsante del texto adaptativa
+        float time = blinkClock.getElapsedTime().asSeconds();
+        float pulseScale = 1.0f + 0.1f * sin(time * 3.0f);
+        
+        // Reducir la pulsación en pantallas muy pequeñas para mejor legibilidad
+        if (windowSize.x < 600) {
+            pulseScale = 1.0f + 0.05f * sin(time * 3.0f);
+        }
+        
+        victoryText.setScale(pulseScale, pulseScale);
+        
+        // Animación del botón
+        float buttonAlpha = 200 + 55 * sin(time * 5);
+        playAgainButtonText.setFillColor(sf::Color(255, 255, 255, (sf::Uint8)buttonAlpha));
+    }
+    
+    void updateButtonHover(float mouseX, float mouseY) {
+        sf::FloatRect buttonBounds = playAgainButton.getGlobalBounds();
+        bool wasHovered = buttonHovered;
+        buttonHovered = buttonBounds.contains(mouseX, mouseY);
+        
+        if (buttonHovered && !wasHovered) {
+            playAgainButton.setFillColor(sf::Color(80, 200, 80, 240));
+            playAgainButton.setScale(1.05f, 1.05f);
+        } else if (!buttonHovered && wasHovered) {
+            playAgainButton.setFillColor(sf::Color(50, 150, 50, 200));
+            playAgainButton.setScale(1.0f, 1.0f);
+        }
+    }
+    
+    bool isPlayAgainButtonClicked(float mouseX, float mouseY) {
+        return playAgainButton.getGlobalBounds().contains(mouseX, mouseY);
+    }
+    
+    void draw(sf::RenderWindow& window) {
+        sf::Vector2u windowSize = window.getSize();
+        float scale = min(
+            windowSize.x / 1200.0f,
+            windowSize.y / 800.0f
+        );
+        scale = max(0.5f, min(scale, 2.0f));
+
+        sf::Vector2f center(windowSize.x / 2.0f, windowSize.y / 2.0f);
+
+        // Fondo oscuro responsive
+        backgroundGradient.setSize(sf::Vector2f(windowSize.x, windowSize.y));
+        window.draw(backgroundGradient);
+
+        // Partículas doradas
+        for (auto& particle : particles) {
+            window.draw(particle);
+        }
+
+        // Trofeo con mejor posicionamiento responsive
+        float trophyOffset = 120 * scale;
+        if (windowSize.y < 600) trophyOffset = 80 * scale;
+        drawTrophy(window, sf::Vector2f(center.x, center.y - trophyOffset), scale);
+
+        // Texto de victoria con escala adaptativa
+        float victoryTextSize = 64 * scale;
+        if (windowSize.x < 800) victoryTextSize = 48 * scale;
+        if (windowSize.x < 600) victoryTextSize = 36 * scale;
+        
+        victoryText.setCharacterSize(static_cast<unsigned int>(victoryTextSize));
+        sf::FloatRect victoryBounds = victoryText.getLocalBounds();
+        victoryText.setOrigin(victoryBounds.width/2, victoryBounds.height/2);
+        
+        float victoryYOffset = -20 * scale;
+        if (windowSize.y < 600) victoryYOffset = 10 * scale;
+        victoryText.setPosition(center.x, center.y + victoryYOffset);
+        window.draw(victoryText);
+
+        // Estadísticas con mejor espaciado responsive
+        float statsTextSize = 16 * scale;
+        if (windowSize.x < 800) statsTextSize = 14 * scale;
+        if (windowSize.x < 600) statsTextSize = 12 * scale;
+        
+        float statsStartY = center.y + 40 * scale;
+        if (windowSize.y < 600) statsStartY = center.y + 60 * scale;
+        
+        timeText.setCharacterSize(static_cast<unsigned int>(statsTextSize));
+        sf::FloatRect timeBounds = timeText.getLocalBounds();
+        timeText.setOrigin(timeBounds.width/2, timeBounds.height/2);
+        timeText.setPosition(center.x, statsStartY);
+        window.draw(timeText);
+
+        movesText.setCharacterSize(static_cast<unsigned int>(statsTextSize));
+        sf::FloatRect movesBounds = movesText.getLocalBounds();
+        movesText.setOrigin(movesBounds.width/2, movesBounds.height/2);
+        movesText.setPosition(center.x, statsStartY + 30 * scale);
+        window.draw(movesText);
+
+        // Botón Play Again con dimensiones adaptativas
+        float buttonWidth = 300 * scale;
+        float buttonHeight = 60 * scale;
+        float buttonYOffset = 130 * scale;
+        
+        if (windowSize.x < 800) {
+            buttonWidth = 250 * scale;
+            buttonHeight = 50 * scale;
+        }
+        if (windowSize.x < 600) {
+            buttonWidth = 200 * scale;
+            buttonHeight = 40 * scale;
+        }
+        if (windowSize.y < 600) {
+            buttonYOffset = 150 * scale;
+        }
+        
+        playAgainButton.setSize(sf::Vector2f(buttonWidth, buttonHeight));
+        playAgainButton.setOrigin(playAgainButton.getSize().x/2, playAgainButton.getSize().y/2);
+        playAgainButton.setPosition(center.x, center.y + buttonYOffset);
+        window.draw(playAgainButton);
+
+        float buttonTextSize = 20 * scale;
+        if (windowSize.x < 800) buttonTextSize = 18 * scale;
+        if (windowSize.x < 600) buttonTextSize = 16 * scale;
+        
+        playAgainButtonText.setCharacterSize(static_cast<unsigned int>(buttonTextSize));
+        sf::FloatRect buttonTextBounds = playAgainButtonText.getLocalBounds();
+        playAgainButtonText.setOrigin(buttonTextBounds.width/2, buttonTextBounds.height/2);
+        playAgainButtonText.setPosition(center.x, center.y + buttonYOffset);
+        window.draw(playAgainButtonText);
+    }
+};
+
 int turnCount = 0;
 const int TURNS_PER_EVENT = 5;
 const int TURNS_TO_MOVE_GOAL = 10;
@@ -780,6 +1101,7 @@ int main() {
     }
 
     TitleScreen titleScreen(font);
+    VictoryScreen victoryScreen(font);
 
     sf::RectangleShape menuBackground(sf::Vector2f(menuWidth, 2000));
     menuBackground.setPosition(0, 0);
@@ -885,6 +1207,12 @@ int main() {
                     window.setView(sf::View(visibleArea));
                     titleScreen.onWindowResize(sf::Vector2u(e.size.width, e.size.height));
                 }
+                else if (gameState == GameState::Solved) {
+                    // Handle victory screen resize similar to title screen
+                    sf::FloatRect visibleArea(0, 0, e.size.width, e.size.height);
+                    window.setView(sf::View(visibleArea));
+                    victoryScreen.onWindowResize(sf::Vector2u(e.size.width, e.size.height));
+                }
                 else {
                     updateViews(window);
                 }
@@ -964,20 +1292,47 @@ int main() {
                                     if (currentX == goalX && currentY == goalY) {
                                         solved = true;
                                         gameState = GameState::Solved;
+                                        victoryScreen.setGameStats(moveCount, gameClock.getElapsedTime().asSeconds());
                                     }
                                 }
                             }
                         }
                     }
                 }
+                
+                if (e.mouseButton.button == sf::Mouse::Left && gameState == GameState::Solved) {
+                    sf::Vector2i mousePos(e.mouseButton.x, e.mouseButton.y);
+                    if (victoryScreen.isPlayAgainButtonClicked(mousePos.x, mousePos.y)) {
+                        // Reset the game completely
+                        resetGame(goal);
+                        currentX = startX;
+                        currentY = startY;
+                        player.setPosition(
+                            startX * cellSize + cellSize/2 - cellSize/5,
+                            startY * cellSize + cellSize/2 - cellSize/5
+                        );
+                        currentPos = player.getPosition();
+                        moveCount = 0;
+                        solved = false;
+                        autoMode = false;
+                        gameState = GameState::Menu;
+                        gameClock.restart();
+                    }
+                }
             }
             
             if (e.type == sf::Event::MouseMoved && gameState != GameState::TitleScreen) {
                 sf::Vector2i mousePos(e.mouseMove.x, e.mouseMove.y);
-                sf::Vector2f menuCoords = windowToMenuCoords(mousePos, window);
                 
-                for (auto& button : buttons) {
-                    button->updateHover(menuCoords.x, menuCoords.y);
+                if (gameState == GameState::Solved) {
+                    // Handle victory screen mouse hover directly
+                    victoryScreen.updateButtonHover(mousePos.x, mousePos.y);
+                } else {
+                    // Handle menu buttons for other states
+                    sf::Vector2f menuCoords = windowToMenuCoords(mousePos, window);
+                    for (auto& button : buttons) {
+                        button->updateHover(menuCoords.x, menuCoords.y);
+                    }
                 }
             }
                 
@@ -1003,6 +1358,7 @@ int main() {
                         if (currentX == goalX && currentY == goalY) {
                             solved = true;
                             gameState = GameState::Solved;
+                            victoryScreen.setGameStats(moveCount, gameClock.getElapsedTime().asSeconds());
                         }
                     }
                 }
@@ -1029,6 +1385,13 @@ int main() {
                     solved = false;
                     autoMode = false;
                     gameState = GameState::Menu;
+                }
+                
+                // Debug key to test victory screen - press 'V' to win instantly
+                if (e.key.code == sf::Keyboard::V && gameState == GameState::Playing) {
+                    solved = true;
+                    gameState = GameState::Solved;
+                    victoryScreen.setGameStats(moveCount, gameClock.getElapsedTime().asSeconds());
                 }
             }
         }
@@ -1121,6 +1484,7 @@ int main() {
                 if (currentX == goalX && currentY == goalY) {
                     solved = true;
                     gameState = GameState::Solved;
+                    victoryScreen.setGameStats(moveCount, gameClock.getElapsedTime().asSeconds());
                     autoMode = false;
                 }
             }
@@ -1164,6 +1528,12 @@ int main() {
         sf::FloatRect timeBounds = timeText.getLocalBounds();
         timeText.setPosition((menuWidth - timeBounds.width) / 2.f, windowSize.y - 20);
 
+        
+        // Update victory screen if in solved state
+        if (gameState == GameState::Solved) {
+            victoryScreen.update(windowSize);
+        }
+        
         window.clear(sf::Color(15, 15, 25));
         
         window.setView(gameView);
@@ -1210,6 +1580,14 @@ int main() {
         window.draw(statusText);
         window.draw(movesText);
         window.draw(timeText);
+        
+        // Draw victory screen on top if game is solved
+        if (gameState == GameState::Solved) {
+            // Use a full window view for the victory screen, similar to title screen
+            sf::View fullWindowView(sf::FloatRect(0, 0, windowSize.x, windowSize.y));
+            window.setView(fullWindowView);
+            victoryScreen.draw(window);
+        }
         
         window.display();
     }
