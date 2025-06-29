@@ -11,7 +11,6 @@
 
 using namespace std;
 
-// ==================== ESTRUCTURAS Y ENUMS ====================
 enum class CellType { Empty, Wall, Start, Goal, Crystal };
 enum class GameState { TitleScreen, Menu, Playing, Solved };
 
@@ -75,7 +74,6 @@ struct Button {
     }
 };
 
-// ==================== TITLE SCREEN (CORREGIDO) ====================
 class TitleScreen {
 private:
     sf::Font font;
@@ -226,50 +224,42 @@ public:
 
     sf::Vector2f center(windowSize.x / 2.0f, windowSize.y / 2.0f);
 
-    // Fondo que cubre toda la pantalla
     backgroundGradient.setSize(sf::Vector2f(windowSize.x, windowSize.y));
     window.draw(backgroundGradient);
 
-    // Partículas de fondo
     for (auto& particle : particles) {
         window.draw(particle);
     }
 
-    // Título - Centrado verticalmente
     titleText.setCharacterSize(static_cast<unsigned int>(48 * scale));
     sf::FloatRect titleBounds = titleText.getLocalBounds();
     titleText.setOrigin(titleBounds.width/2, titleBounds.height/2);
-    titleText.setPosition(center.x, center.y - 100);  // Ajustado para centrar verticalmente
+    titleText.setPosition(center.x, center.y - 100);
     window.draw(titleText);
 
-    // Subtítulo
     subtitleText.setCharacterSize(static_cast<unsigned int>(24 * scale));
     sf::FloatRect subtitleBounds = subtitleText.getLocalBounds();
     subtitleText.setOrigin(subtitleBounds.width/2, subtitleBounds.height/2);
-    subtitleText.setPosition(center.x, center.y - 40);  // Ajustado para centrar verticalmente
+    subtitleText.setPosition(center.x, center.y - 40);
     window.draw(subtitleText);
 
-    // Botón
     startButton.setSize(sf::Vector2f(400 * scale, 70 * scale));
     startButton.setOrigin(startButton.getSize().x/2, startButton.getSize().y/2);
-    startButton.setPosition(center.x, center.y + 50);  // Ajustado para centrar verticalmente
+    startButton.setPosition(center.x, center.y + 50);
     window.draw(startButton);
 
-    // Texto del botón
     startButtonText.setCharacterSize(static_cast<unsigned int>(24 * scale));
     sf::FloatRect buttonTextBounds = startButtonText.getLocalBounds();
     startButtonText.setOrigin(buttonTextBounds.width/2, buttonTextBounds.height/2);
-    startButtonText.setPosition(center.x, center.y + 50);  // Ajustado para centrar verticalmente
+    startButtonText.setPosition(center.x, center.y + 50);
     window.draw(startButtonText);
 
-    // Instrucciones
     instructionText.setCharacterSize(static_cast<unsigned int>(16 * scale));
     sf::FloatRect instrBounds = instructionText.getLocalBounds();
     instructionText.setOrigin(instrBounds.width/2, instrBounds.height/2);
-    instructionText.setPosition(center.x, center.y + 150);  // Ajustado para centrar verticalmente
+    instructionText.setPosition(center.x, center.y + 150);
     window.draw(instructionText);
 
-    // Créditos
     creditText.setCharacterSize(static_cast<unsigned int>(12 * scale));
     sf::FloatRect creditBounds = creditText.getLocalBounds();
     creditText.setOrigin(creditBounds.width/2, creditBounds.height/2);
@@ -278,7 +268,6 @@ public:
 }
 };
 
-// ==================== VARIABLES GLOBALES ====================
 int turnCount = 0;
 const int TURNS_PER_EVENT = 5;
 const int TURNS_TO_MOVE_GOAL = 10;
@@ -296,11 +285,14 @@ sf::View gameView, menuView;
 
 int lastX = -1, lastY = -1;
 
-// ==================== FUNCIONES AUXILIARES ====================
+// Función de validación de límites del laberinto
+// Verifica que las coordenadas se encuentren dentro de los límites válidos
 bool inside(int y, int x) {
     return x >= 0 && x < W && y >= 0 && y < H;
 }
 
+// Sistema de reflexión horizontal para cristales
+// Implementa la mecánica de espejo horizontal cuando se activa un cristal
 void reflectHorizontally(int crystalX, int crystalY) {
     for (int x = 0; x < crystalX; x++) {
         int reflectedX = crystalX + (crystalX - x);
@@ -317,6 +309,8 @@ void reflectHorizontally(int crystalX, int crystalY) {
     }
 }
 
+// Sistema de reflexión vertical para cristales
+// Implementa la mecánica de espejo vertical cuando se activa un cristal
 void reflectVertically(int crystalX, int crystalY) {
     for (int y = 0; y < crystalY; y++) {
         int reflectedY = crystalY + (crystalY - y);
@@ -333,6 +327,8 @@ void reflectVertically(int crystalX, int crystalY) {
     }
 }
 
+// Controlador dinámico del sistema de reflexión de cristales
+// Determina el tipo de reflexión basado en la dirección del movimiento del jugador
 void reflectDynamically(int crystalX, int crystalY, int directionX, int directionY) {
     cout << "Cristal activado en (" << crystalX << "," << crystalY << ") - Direccion: (" << directionX << "," << directionY << ")\n";
     
@@ -345,6 +341,7 @@ void reflectDynamically(int crystalX, int crystalY, int directionX, int directio
     }
 }
 
+// Función de activación de cristales basada en movimiento
 void reflectCrystals(int currentX, int currentY) {
     int directionX = 0, directionY = 0;
     
@@ -361,6 +358,7 @@ void reflectCrystals(int currentX, int currentY) {
     lastY = currentY;
 }
 
+// Sistema de verificación y actualización del objetivo
 void verifyGoal(sf::CircleShape& goal) {
     if (grid[goalY*W + goalX].type != CellType::Goal) {
         grid[goalY*W + goalX].type = CellType::Goal;
@@ -375,6 +373,7 @@ void verifyGoal(sf::CircleShape& goal) {
     );
 }
 
+// Algoritmo de reubicación dinámica del objetivo
 void moveGoal(int currentX, int currentY, sf::CircleShape& goal) {
     int oldGoalX = goalX;
     int oldGoalY = goalY;
@@ -405,7 +404,9 @@ void moveGoal(int currentX, int currentY, sf::CircleShape& goal) {
     turnsSinceLastGoalMove = 0;
 }
 
+// Función para cargar el laberinto desde archivo - Gestiona la lectura e inicialización de la estructura del laberinto desde archivos externos
 bool loadMaze(const string& path) {
+    // Intento de apertura del archivo de configuración del laberinto
     ifstream file(path);
     if (!file.is_open()) {
         cout << "No se pudo abrir: " << path << endl;
@@ -417,6 +418,7 @@ bool loadMaze(const string& path) {
         return false;
     }
     
+    // Cálculo del espacio de memoria requerido y optimización de recursos
     int totalCells = W * H;
     int memoryCapacity = min(totalCells, 2500);
     
@@ -452,6 +454,7 @@ bool loadMaze(const string& path) {
     return true;
 }
 
+// Generador de laberinto por defecto
 void createDefaultMaze() {
     W = 12; H = 10;
     startX = 1; startY = 1;
@@ -484,6 +487,7 @@ void createDefaultMaze() {
     grid[goalY*W + goalX] = {CellType::Goal};
 }
 
+// Sistema de reinicialización del estado del juego
 void resetGame(sf::CircleShape& goal) {
     gameState = GameState::Menu;
     turnCount = 0;
@@ -508,6 +512,8 @@ void resetGame(sf::CircleShape& goal) {
     verifyGoal(goal);
 }
 
+// Generador de eventos aleatorios del mapa
+// Introduce cambios dinámicos en la estructura del laberinto durante el juego
 void triggerMapEvent() {
     int rx = rand() % W;
     int ry = rand() % H;
@@ -522,12 +528,16 @@ void triggerMapEvent() {
     }
 }
 
+// Algoritmo BFS para resolver el laberinto - implementación de búsqueda en anchura
 void bfsSolve() {
+    // Variables estáticas para memoización y optimización de cálculos repetitivos
     static vector<pair<int,int>> lastPath;
     static int lastStartX = -1, lastStartY = -1, lastGoalX = -1, lastGoalY = -1;
     
+    // Verificación de validez del camino previamente calculado para evitar recálculos innecesarios
     if (lastStartX == startX && lastStartY == startY && lastGoalX == goalX && lastGoalY == goalY && !lastPath.empty()) {
         bool pathValid = true;
+        // Validación de integridad del camino almacenado
         for (auto [y, x] : lastPath) {
             if (grid[y*W + x].type == CellType::Wall) {
                 pathValid = false;
@@ -555,6 +565,7 @@ void bfsSolve() {
     
     path.clear();
     
+    // Inicialización de estructuras de datos para el algoritmo BFS
     vector<vector<int>> cost(H, vector<int>(W, INT_MAX));
     vector<vector<pair<int,int>>> parent(H, vector<pair<int,int>>(W, {-1,-1}));
     queue<pair<int,int>> q;
@@ -562,9 +573,11 @@ void bfsSolve() {
     cost[startY][startX] = 0;
     q.push({startY, startX});
     
+    // Vectores direccionales para exploración de adyacencias: arriba, abajo, derecha, izquierda
     int dirs[4][2] = {{1,0}, {-1,0}, {0,1}, {0,-1}};
     bool found = false;
 
+    // Implementación del algoritmo BFS - exploración sistemática por niveles
     while (!q.empty()) {
         auto [y,x] = q.front(); q.pop();
         
@@ -573,13 +586,16 @@ void bfsSolve() {
             break; 
         }
         
+        // Exploración de todas las direcciones factibles desde la posición actual
         for (auto& d : dirs) {
             int ny = y + d[0];
             int nx = x + d[1];
             
+            // Validaciones de límites y obstáculos
             if (!inside(ny,nx)) continue;
             if (grid[ny*W+nx].type == CellType::Wall) continue;
             
+            // Sistema de costos ponderados basado en tipos de celda
             int moveCost = 1;
             if (grid[ny*W+nx].type == CellType::Crystal) moveCost = 3;
             if (grid[ny*W+nx].hasBeenTraversed) moveCost = 1;
@@ -595,6 +611,7 @@ void bfsSolve() {
     }
 
     if (found) {
+        // Algoritmo de retroceso para generar la secuencia completa de movimientos
         for (int cy = goalY, cx = goalX; cy != -1; ) {
             path.push_back({cy,cx});
             auto p = parent[cy][cx];
@@ -603,12 +620,14 @@ void bfsSolve() {
         }
         reverse(path.begin(), path.end());
         
+        // Almacenamiento del resultado para optimización de consultas futuras
         lastPath = path;
         lastStartX = startX; lastStartY = startY;
         lastGoalX = tempGoalX; lastGoalY = tempGoalY;
     }
 }
 
+// Sistema de coloración diferencial de celdas
 sf::Color getCellColor(CellType type, int x, int y, bool visited, bool isOnPath, bool hasBeenTraversed) {
     if (type == CellType::Crystal) return sf::Color(0, 255, 255, 180);
     
@@ -625,6 +644,7 @@ sf::Color getCellColor(CellType type, int x, int y, bool visited, bool isOnPath,
     }
 }
 
+// Controlador de movimiento del jugador con validaciones
 bool tryMovePlayer(int newX, int newY, int& currentX, int& currentY, sf::CircleShape& player, sf::CircleShape& goal) {
     if (inside(newY, newX) && grid[newY*W + newX].type != CellType::Wall) {
         currentX = newX;
@@ -660,6 +680,8 @@ bool tryMovePlayer(int newX, int newY, int& currentX, int& currentY, sf::CircleS
     return false;
 }
 
+// Generador de formas triangulares para representación visual
+// Crea elementos gráficos triangulares con patrón alternante para las celdas
 sf::ConvexShape makeTri(int x, int y) {
     sf::ConvexShape tri;
     tri.setPointCount(3);
@@ -698,6 +720,7 @@ sf::ConvexShape makeTri(int x, int y) {
     return tri;
 }
 
+
 sf::Text createStyledText(const string& text, sf::Font& font, int size, sf::Color color, float x, float y) {
     sf::Text styledText(text, font, size);
     styledText.setFillColor(color);
@@ -705,13 +728,16 @@ sf::Text createStyledText(const string& text, sf::Font& font, int size, sf::Colo
     return styledText;
 }
 
+
 sf::Vector2f windowToGameCoords(sf::Vector2i windowPos, const sf::RenderWindow& window) {
     return window.mapPixelToCoords(windowPos, gameView);
 }
 
+
 sf::Vector2f windowToMenuCoords(sf::Vector2i windowPos, const sf::RenderWindow& window) {
     return window.mapPixelToCoords(windowPos, menuView);
 }
+
 
 void updateViews(sf::RenderWindow& window) {
     sf::Vector2u windowSize = window.getSize();
@@ -727,7 +753,9 @@ void updateViews(sf::RenderWindow& window) {
     menuView.setViewport(sf::FloatRect(gameViewWidth / windowSize.x, 0, menuWidth / windowSize.x, 1.0f));
 }
 
+// Función principal del programa - punto de entrada y controlador central del sistema
 int main() {
+    // Proceso de carga del laberinto con múltiples rutas de búsqueda
     if (!loadMaze("../assets/maze.txt") && !loadMaze("assets/maze.txt") && !loadMaze("maze.txt")) {
         createDefaultMaze();
     }
@@ -736,6 +764,7 @@ int main() {
     float initialGameHeight = H * cellSize;
     float initialTotalWidth = initialGameWidth + menuWidth;
     
+    // Inicialización del sistema de renderizado con configuraciones específicas
     sf::RenderWindow window(sf::VideoMode(initialTotalWidth, initialGameHeight), "Escape the Grid", sf::Style::Default);
     window.setFramerateLimit(60);
     
@@ -840,10 +869,12 @@ int main() {
 
     grid[startY*W + startX].hasBeenTraversed = true;
 
+    // Gestiona eventos de usuario, lógica de juego y renderizado de frames
     while (window.isOpen()) {
         float dt = moveClock.restart().asSeconds();
         sf::Event e;
         
+        // Sistema de procesamiento de eventos del sistema operativo
         while (window.pollEvent(e)) {
             if (e.type == sf::Event::Closed) 
                 window.close();
@@ -873,23 +904,21 @@ int main() {
             }
                 
             if (e.type == sf::Event::MouseButtonPressed) {
-                sf::Vector2i mousePos(e.mouseButton.x, e.mouseButton.y);
-                sf::Vector2f menuCoords = windowToMenuCoords(mousePos, window);
-                sf::Vector2f gameCoords = windowToGameCoords(mousePos, window);
-                
-                bool buttonClicked = false;
-                for (size_t i = 0; i < buttons.size(); i++) {
-                    if (buttons[i]->contains(menuCoords.x, menuCoords.y)) {
-                        buttonClicked = true;
-                        switch (i) {
-                            case 0: // PLAY
-                                gameState = GameState::Playing;
-                                autoMode = false;
-                                solved = false;
-                                gameClock.restart();
-                                break;
-                            case 1: // AUTO-SOLVE
-                                if (gameState == GameState::Menu || gameState == GameState::Playing) {
+                sf::Vector2i mousePos(e.mouseButton.x, e.mouseButton.y);                                sf::Vector2f menuCoords = windowToMenuCoords(mousePos, window);
+                                sf::Vector2f gameCoords = windowToGameCoords(mousePos, window);
+                                
+                                bool buttonClicked = false;
+                                for (size_t i = 0; i < buttons.size(); i++) {
+                                    if (buttons[i]->contains(menuCoords.x, menuCoords.y)) {
+                                        buttonClicked = true;
+                                        switch (i) {
+                                            case 0:
+                                                gameState = GameState::Playing;
+                                autoMode = false;                                                solved = false;
+                                                gameClock.restart();
+                                                break;
+                                            case 1:
+                                                if (gameState == GameState::Menu || gameState == GameState::Playing) {
                                     gameState = GameState::Playing;
                                     solved = false;
                                     startY = currentY;
@@ -898,12 +927,11 @@ int main() {
                                     autoMode = true;
                                     step = 0;
                                     currentPos = player.getPosition();
-                                    moveCount = 0;
-                                    gameClock.restart();
-                                }
-                                break;
-                            case 2: // RESTART
-                                resetGame(goal);
+                                    moveCount = 0;                                                    gameClock.restart();
+                                                }
+                                                break;
+                                            case 2:
+                                                resetGame(goal);
                                 currentX = startX;
                                 currentY = startY;
                                 player.setPosition(
@@ -1005,6 +1033,7 @@ int main() {
             }
         }
 
+        // Gestión especializada para el estado de pantalla de título
         if (gameState == GameState::TitleScreen) {
             titleScreen.update(window.getSize());
             window.clear();
@@ -1013,6 +1042,7 @@ int main() {
             continue;
         }
 
+        // Sistema de resolución automática mediante inteligencia artificial
         if (autoMode && step < path.size()) {
             auto [y, x] = path[step];
             sf::Vector2f nextPos(
@@ -1023,6 +1053,7 @@ int main() {
             sf::Vector2f direction = nextPos - currentPos;
             float distance = sqrt(direction.x*direction.x + direction.y*direction.y);
             
+            // Algoritmo de optimización dinámica para suavizado de animaciones
             vector<int> framePrices = {1, 3, 4, 5};
             int totalFrames = max(1, (int)(distance / 2.0f));
             
@@ -1078,12 +1109,11 @@ int main() {
                     verifyGoal(goal);
 
                     step = 0;
-                    if (path.empty()) {
-                        autoMode = false;
-                        break;
-                    }
-                    continue;  
+                    if (path.empty()) {                    autoMode = false;
+                    break;
                 }
+                continue;
+            }
 
                 step++;
                 moveCount++;
