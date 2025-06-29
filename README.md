@@ -59,7 +59,7 @@ No se requiere ninguna dependencia extra ni configuración compleja:
 ## GIFs
 
 - **Juego normal**
-1. ![Juego](https://media.giphy.com/media/McJuiH1q4aQjDzNJlS/giphy.gif)
+1. ![Juego](https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExMXpoNTQyazVndnU5NGV0Ymxndnp1dXJheDRuaGc1bDhkZ2U3eXcydSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/jiFarEgbM4i6J2fvjS/giphy.gif)
 - **Juego normal y presionando la tecla Enter**  
 2. ![Juego+Enter](https://media.giphy.com/media/gpOtJrjBl01hYA9x9n/giphy.gif)
 - **Juego autocompletado y presionando la opción de Reiniciar**
