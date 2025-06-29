@@ -1,0 +1,31 @@
+# Archivos que no deben subirse al repositorio
+*.o
+*.obj
+*.exe.manifest
+*.pdb
+*.ilk
+.vs/
+Debug/
+Release/
+x64/
+
+# Pero SÍ incluir el ejecutable final
+!build/EscapeTheGrid.exe
+
+# Archivos temporales de Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Archivos de editores
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Archivos de compilación intermedios que no necesitamos
+BFS.o
+main.o
+MazeLoader.o

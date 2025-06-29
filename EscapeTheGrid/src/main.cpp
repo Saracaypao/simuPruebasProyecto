@@ -1,3 +1,4 @@
+#define SFML_STATIC
 #include <SFML/Graphics.hpp>
 #include <SFML/System.hpp>
 #include <fstream>
@@ -727,10 +728,31 @@ void moveGoal(int currentX, int currentY, sf::CircleShape& goal) {
 
 // Función para cargar el laberinto desde archivo - Gestiona la lectura e inicialización de la estructura del laberinto desde archivos externos
 bool loadMaze(const string& path) {
-    // Intento de apertura del archivo de configuración del laberinto
-    ifstream file(path);
+    // Lista de rutas posibles para el archivo del laberinto
+    vector<string> possiblePaths = {
+        path,
+        "assets/" + path,
+        "../assets/" + path,
+        "./assets/maze.txt",
+        "../assets/maze.txt",
+        "maze.txt"
+    };
+    
+    ifstream file;
+    string foundPath;
+    
+    // Buscar el archivo en las rutas posibles
+    for (const string& testPath : possiblePaths) {
+        file.open(testPath);
+        if (file.is_open()) {
+            foundPath = testPath;
+            cout << "Laberinto cargado desde: " << foundPath << endl;
+            break;
+        }
+    }
+    
     if (!file.is_open()) {
-        cout << "No se pudo abrir: " << path << endl;
+        cout << "No se pudo abrir el archivo de laberinto en ninguna ubicacion" << endl;
         return false;
     }
     
@@ -1102,12 +1124,31 @@ int main() {
     updateViews(window);
     
     sf::Font font;
-    if (!font.loadFromFile("../assets/PRESSSTART2P-REGULAR.TTF") && 
-        !font.loadFromFile("assets/PRESSSTART2P-REGULAR.TTF") &&
-        !font.loadFromFile("../assets/arial.ttf") && 
-        !font.loadFromFile("assets/arial.ttf")) {
-        cerr << "Error cargando fuente" << endl;
-        return 1;
+    
+    // Lista de rutas posibles para las fuentes
+    vector<string> fontPaths = {
+        "assets/PRESSSTART2P-REGULAR.TTF",
+        "../assets/PRESSSTART2P-REGULAR.TTF", 
+        "./assets/PRESSSTART2P-REGULAR.TTF",
+        "PRESSSTART2P-REGULAR.TTF",
+        "assets/ARIAL.TTF",
+        "../assets/ARIAL.TTF",
+        "./assets/ARIAL.TTF",
+        "ARIAL.TTF"
+    };
+    
+    bool fontLoaded = false;
+    for (const string& fontPath : fontPaths) {
+        if (font.loadFromFile(fontPath)) {
+            cout << "Fuente cargada desde: " << fontPath << endl;
+            fontLoaded = true;
+            break;
+        }
+    }
+    
+    if (!fontLoaded) {
+        cout << "⚠️  No se pudo cargar ninguna fuente, usando fuente por defecto" << endl;
+        // Continuar sin fuente personalizada - SFML usará la por defecto
     }
 
     TitleScreen titleScreen(font);
