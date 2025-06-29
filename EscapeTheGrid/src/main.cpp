@@ -841,10 +841,18 @@ void triggerMapEvent() {
     Cell& c = grid[ry*W + rx];
     if (c.type == CellType::Empty) {
         c.type = CellType::Wall;
+        // Limpiar estados cuando se convierte en muro
+        c.visited = false;
+        c.isOnPath = false;
+        c.hasBeenTraversed = false;
         cout << "Evento: aparece muro en (" << rx << "," << ry << ")\n";
     }
     else if (c.type == CellType::Wall) {
         c.type = CellType::Empty;
+        // Limpiar estados cuando se convierte en celda vacía
+        c.visited = false;
+        c.isOnPath = false;
+        c.hasBeenTraversed = false;
         cout << "Evento: desaparece muro en (" << rx << "," << ry << ")\n";
     }
 }
@@ -950,6 +958,9 @@ void bfsSolve() {
 
 // Sistema de coloración diferencial de celdas
 sf::Color getCellColor(CellType type, int x, int y, bool visited, bool isOnPath, bool hasBeenTraversed) {
+    // Los muros siempre deben tener su color específico, sin importar otros estados
+    if (type == CellType::Wall) return sf::Color(40, 40, 40);
+    
     if (type == CellType::Crystal) return sf::Color(0, 255, 255, 180);
     
     if (type == CellType::Goal) return sf::Color(0, 200, 0, 150);
@@ -957,7 +968,6 @@ sf::Color getCellColor(CellType type, int x, int y, bool visited, bool isOnPath,
     if (hasBeenTraversed) return sf::Color(192, 192, 192, 200);
     
     switch (type) {
-        case CellType::Wall: return sf::Color(40, 40, 40);
         case CellType::Start: return sf::Color(100, 255, 100, 200);
         case CellType::Empty:
         default: 
