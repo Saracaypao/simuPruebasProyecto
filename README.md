@@ -61,8 +61,8 @@ No se requiere ninguna dependencia extra ni configuración compleja:
 - **Juego normal**
 1. ![Juego](https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExMXpoNTQyazVndnU5NGV0Ymxndnp1dXJheDRuaGc1bDhkZ2U3eXcydSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/jiFarEgbM4i6J2fvjS/giphy.gif)
 - **Juego normal y presionando la tecla Enter**  
-2. ![Juego+Enter](https://media.giphy.com/media/gpOtJrjBl01hYA9x9n/giphy.gif)
-- **Juego autocompletado y presionando la opción de Reiniciar**
-3. ![Juego autocompletado+Reiniciar](https://media.giphy.com/media/ksCOxPhj2aioOwfPuO/giphy.gif)   
+2. ![Juego+Enter](https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExYTF4aGh1OG5lejhxamJqbXU3NGJ4Mng3a2g1anViY3B1dGpod2VteCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/I2JAOdjqpBtHoAZ6EA/giphy.gif)
+- **Juego autocompletado**
+3. ![Juego autocompletado+Reiniciar](https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExZjllZnR3bHczMG5kOGk2dmtpbTNoOXZ4OWVyeW4zZDk3czYxZTk1aiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/Xi8NyQcZpfTpb1S2Oe/giphy.gif)   
 
 
